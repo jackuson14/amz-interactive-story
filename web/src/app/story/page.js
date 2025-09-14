@@ -1,7 +1,11 @@
 "use client";
+export const dynamic = 'force-dynamic';
+
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { SAMPLE_STORIES } from "@/data/stories";
+
 
 const SELFIE_KEY = "selfie_v1";
 
@@ -9,29 +13,32 @@ export default function StoryPage() {
   const [selfie, setSelfie] = useState(null);
   const [idx, setIdx] = useState(0);
 
-  // Mock "generated" story
+  // Load selected sample story via query param (client), with a default fallback
+  const [storyId, setStoryId] = useState(null);
+  useEffect(() => {
+    try {
+      const qs = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+      const id = qs ? qs.get('story') : null;
+      if (id) setStoryId(id);
+    } catch {}
+  }, []);
+
+  const storyTitle = useMemo(() => {
+    const f = SAMPLE_STORIES.find((s) => s.id === storyId);
+    return f?.title ?? "Default";
+  }, [storyId]);
+
   const scenes = useMemo(
-    () => [
-      {
-        id: "intro",
-        title: "Arrival",
-        text: "You arrive at the ancient gates as dusk settles over the valley.",
-        bg: "from-amber-100 via-rose-100 to-sky-100",
-      },
-      {
-        id: "meet",
-        title: "A Whispered Path",
-        text: "A soft voice beckons you down a lantern-lit trail.",
-        bg: "from-sky-100 via-indigo-100 to-fuchsia-100",
-      },
-      {
-        id: "choice",
-        title: "Crossroads",
-        text: "Ahead splits in two: follow the glow or forge your own way.",
-        bg: "from-emerald-100 via-teal-100 to-cyan-100",
-      },
-    ],
-    []
+    () => {
+      const f = SAMPLE_STORIES.find((s) => s.id === storyId);
+      if (f) return f.scenes;
+      return [
+        { id: "intro", title: "Arrival", text: "You arrive at the ancient gates as dusk settles over the valley.", bg: "from-amber-100 via-rose-100 to-sky-100" },
+        { id: "meet", title: "A Whispered Path", text: "A soft voice beckons you down a lantern-lit trail.", bg: "from-sky-100 via-indigo-100 to-fuchsia-100" },
+        { id: "choice", title: "Crossroads", text: "Ahead splits in two: follow the glow or forge your own way.", bg: "from-emerald-100 via-teal-100 to-cyan-100" },
+      ];
+    },
+    [storyId]
   );
 
   useEffect(() => {
@@ -53,10 +60,11 @@ export default function StoryPage() {
       <section className="px-6 sm:px-10 md:px-16 py-6 border-b bg-gradient-to-b from-white to-gray-50 flex items-center justify-between">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold">Your Story</h1>
-          <p className="text-gray-600 text-sm">Generated locally with placeholder scenes.</p>
+          <p className="text-gray-600 text-sm">Sample: {storyTitle}</p>
         </div>
         <div className="flex gap-2">
           <Link href="/play" className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100">Back</Link>
+          <Link href="/stories" className="rounded-md bg-indigo-600 text-white px-3 py-2 text-sm hover:bg-indigo-500">Browse stories</Link>
         </div>
       </section>
 

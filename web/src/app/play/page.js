@@ -113,7 +113,7 @@ export default function PlayPage() {
           <button onClick={loadCharacter} className="rounded-md bg-black text-white px-4 py-2 text-sm hover:opacity-90">
             {loading ? "Loading..." : "Load placeholder character"}
           </button>
-          <Link href="/story" className="rounded-md bg-indigo-600 text-white px-4 py-2 text-sm hover:bg-indigo-500">
+          <Link href="/stories" className="rounded-md bg-indigo-600 text-white px-4 py-2 text-sm hover:bg-indigo-500">
             Continue
           </Link>
         </div>
