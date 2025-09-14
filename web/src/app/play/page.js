@@ -110,12 +110,7 @@ export default function PlayPage() {
         <p className="mt-2 text-gray-600">Capture a selfie below, then continue to play. Your photo stays on this device in the MVP.</p>
         <div className="mt-6 flex flex-col sm:flex-row flex-wrap gap-3">
           <Link href="/" className="w-full sm:w-auto text-center rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Back to home</Link>
-          <button onClick={loadCharacter} className="w-full sm:w-auto rounded-md bg-black text-white px-4 py-2 text-sm hover:opacity-90">
-            {loading ? "Loading..." : "Load placeholder character"}
-          </button>
-          <Link href="/stories" className="w-full sm:w-auto text-center rounded-md bg-indigo-600 text-white px-4 py-2 text-sm hover:bg-indigo-500">
-            Continue
-          </Link>
+          <Link href="/story" className="w-full sm:w-auto text-center rounded-md bg-indigo-600 text-white px-4 py-2 text-sm hover:bg-indigo-500">Start adventure</Link>
         </div>
       </section>
       {/* Selfie capture */}

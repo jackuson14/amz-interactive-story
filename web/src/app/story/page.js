@@ -19,7 +19,15 @@ export default function StoryPage() {
     try {
       const qs = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
       const id = qs ? qs.get('story') : null;
-      if (id) setStoryId(id);
+      if (id) {
+        setStoryId(id);
+      } else {
+        const list = SAMPLE_STORIES;
+        if (list?.length) {
+          const rid = list[Math.floor(Math.random() * list.length)]?.id;
+          if (rid) setStoryId(rid);
+        }
+      }
     } catch {}
   }, []);
 
@@ -32,11 +40,8 @@ export default function StoryPage() {
     () => {
       const f = SAMPLE_STORIES.find((s) => s.id === storyId);
       if (f) return f.scenes;
-      return [
-        { id: "intro", title: "Arrival", text: "You arrive at the ancient gates as dusk settles over the valley.", bg: "from-amber-100 via-rose-100 to-sky-100" },
-        { id: "meet", title: "A Whispered Path", text: "A soft voice beckons you down a lantern-lit trail.", bg: "from-sky-100 via-indigo-100 to-fuchsia-100" },
-        { id: "choice", title: "Crossroads", text: "Ahead splits in two: follow the glow or forge your own way.", bg: "from-emerald-100 via-teal-100 to-cyan-100" },
-      ];
+      const first = SAMPLE_STORIES[0];
+      return first ? first.scenes : [];
     },
     [storyId]
   );
@@ -54,6 +59,25 @@ export default function StoryPage() {
   const current = scenes[idx];
   const next = () => setIdx((v) => Math.min(v + 1, scenes.length - 1));
   const prev = () => setIdx((v) => Math.max(v - 1, 0));
+  const randomizeStory = () => {
+    const list = SAMPLE_STORIES;
+    if (!list?.length) return;
+    const ids = list.map((s) => s.id);
+    let rid = ids[Math.floor(Math.random() * ids.length)];
+    if (rid === storyId && ids.length > 1) {
+      rid = ids[(ids.indexOf(rid) + 1) % ids.length];
+    }
+    setIdx(0);
+    setStoryId(rid);
+    try {
+      if (typeof window !== 'undefined') {
+        const url = new URL(window.location.href);
+        url.searchParams.set('story', rid);
+        window.history.replaceState({}, '', url.toString());
+      }
+    } catch {}
+  };
+
 
   return (
     <main className="min-h-screen bg-white">
@@ -64,7 +88,7 @@ export default function StoryPage() {
         </div>
         <div className="flex gap-2">
           <Link href="/play" className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100">Back</Link>
-          <Link href="/stories" className="rounded-md bg-indigo-600 text-white px-3 py-2 text-sm hover:bg-indigo-500">Browse stories</Link>
+          <button onClick={randomizeStory} className="rounded-md bg-indigo-600 text-white px-3 py-2 text-sm hover:bg-indigo-500">New story</button>
         </div>
       </section>
 
@@ -74,6 +98,7 @@ export default function StoryPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
             {/* Left: Visual */}
             <div className={`relative overflow-hidden rounded-xl border bg-gradient-to-br ${current.bg} min-h-[260px] md:min-h-[360px]`}>
+
               <div className="absolute inset-0 opacity-40">
                 <div className="w-48 h-48 rounded-full bg-white/60 blur-2xl absolute -top-10 -left-10" />
                 <div className="w-56 h-56 rounded-full bg-white/40 blur-2xl absolute bottom-0 right-0" />
