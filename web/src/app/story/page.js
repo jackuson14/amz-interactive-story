@@ -1,7 +1,7 @@
 "use client";
 export const dynamic = 'force-dynamic';
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { SAMPLE_STORIES } from "@/data/stories";
@@ -12,6 +12,19 @@ const SELFIE_KEY = "selfie_v1";
 export default function StoryPage() {
   const [selfie, setSelfie] = useState(null);
   const [idx, setIdx] = useState(0);
+
+  // Custom story and chat state
+  const [customScenes, setCustomScenes] = useState(null);
+
+  const [messages, setMessages] = useState([]); // {role:'user'|'assistant', text:string}
+  const [prompt, setPrompt] = useState("");
+
+  const autoGenDone = useRef(false);
+
+  // Read-aloud state
+  const [reading, setReading] = useState(false);
+
+
 
   // Load selected sample story via query param (client), with a default fallback
   const [storyId, setStoryId] = useState(null);
@@ -32,11 +45,12 @@ export default function StoryPage() {
   }, []);
 
   const storyTitle = useMemo(() => {
+    if (customScenes) return "Your story";
     const f = SAMPLE_STORIES.find((s) => s.id === storyId);
     return f?.title ?? "Default";
-  }, [storyId]);
+  }, [storyId, customScenes]);
 
-  const scenes = useMemo(
+  const baseScenes = useMemo(
     () => {
       const f = SAMPLE_STORIES.find((s) => s.id === storyId);
       if (f) return f.scenes;
@@ -45,6 +59,7 @@ export default function StoryPage() {
     },
     [storyId]
   );
+  const scenes = customScenes ?? baseScenes;
 
   useEffect(() => {
     try {
@@ -59,6 +74,72 @@ export default function StoryPage() {
   const current = scenes[idx];
   const next = () => setIdx((v) => Math.min(v + 1, scenes.length - 1));
   const prev = () => setIdx((v) => Math.max(v - 1, 0));
+  // Generate a simple 3-scene story from the prompt (local mock)
+  const handleGenerate = (ideaArg) => {
+    const idea = (ideaArg ?? prompt ?? "").trim();
+    if (!idea) return;
+
+    // append messages
+    setMessages((m) => [...m, { role: 'user', text: idea }, { role: 'assistant', text: 'Great! I made a gentle 3‑scene story for you.' }]);
+    const mkScene = (i, title) => ({ id: `c${i}`, title, text: `"${idea}" — ${title}.`, bg: ['from-amber-100 via-rose-100 to-sky-100','from-sky-100 via-indigo-100 to-fuchsia-100','from-emerald-100 via-teal-100 to-cyan-100','from-lime-100 via-emerald-100 to-teal-100','from-pink-100 via-rose-100 to-amber-100'][ (i-1) % 5 ] });
+    const titles = ["Let's Begin", "A New Friend", "A Fun Challenge", "We Work Together", "Happy Ending"];
+    const scenes = titles.map((t, i) => mkScene(i + 1, t));
+    setCustomScenes(scenes);
+    setIdx(0);
+    setPrompt("");
+
+  };
+
+  // Auto-generate from ?prompt or saved prompt (runs once)
+  useEffect(() => {
+    if (autoGenDone.current) return;
+    try {
+      const qs = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+      let p = qs ? qs.get('prompt') : null;
+      if (!p && typeof window !== 'undefined') {
+        try { p = localStorage.getItem('story_prompt_v1') || null; } catch {}
+      }
+      if (p && !customScenes && messages.length === 0) {
+        setPrompt(p);
+        handleGenerate(p);
+        autoGenDone.current = true;
+      }
+    } catch {}
+  }, [customScenes, messages.length]);
+
+  // Read-aloud helpers
+  const speakCurrent = () => {
+    try {
+      if (typeof window === 'undefined') return;
+      const s = window.speechSynthesis;
+      if (!s || !current) return;
+      const u = new SpeechSynthesisUtterance(`${current.title}. ${current.text}`);
+      u.rate = 0.95; // slightly slower for kids
+      u.pitch = 1.05; // a bit brighter
+      u.onend = () => { setReading(false); };
+      s.cancel();
+      s.speak(u);
+      setReading(true);
+
+    } catch {}
+  };
+  const stopReading = () => {
+    try {
+      if (typeof window === 'undefined') return;
+      const s = window.speechSynthesis;
+      if (!s) return;
+      s.cancel();
+      setReading(false);
+
+    } catch {}
+  };
+  // If reading, re-speak when scene changes
+  useEffect(() => {
+    if (reading) speakCurrent();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idx, scenes]);
+
+
   const randomizeStory = () => {
     const list = SAMPLE_STORIES;
     if (!list?.length) return;
@@ -104,10 +185,8 @@ export default function StoryPage() {
                 <div className="w-56 h-56 rounded-full bg-white/40 blur-2xl absolute bottom-0 right-0" />
               </div>
               <div className="absolute left-1/2 -translate-x-1/2 bottom-6">
-                {selfie ? (
+                {selfie && (
                   <Image src={selfie.url} alt="you" width={192} height={192} className="w-32 sm:w-40 md:w-48 h-auto rounded-lg shadow-lg ring-1 ring-black/10" unoptimized />
-                ) : (
-                  <Image src="/placeholder-head.svg" alt="placeholder" width={192} height={192} className="w-32 sm:w-40 md:w-48 h-auto rounded-lg shadow-lg ring-1 ring-black/10" />
                 )}
               </div>
             </div>
@@ -120,12 +199,15 @@ export default function StoryPage() {
               </div>
               <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                 <button onClick={prev} disabled={idx === 0} className="w-full sm:w-auto rounded-md border border-gray-300 px-5 py-3 text-lg text-gray-700 disabled:opacity-40 hover:bg-gray-100">Previous</button>
+                <button onClick={() => speakCurrent()} className="w-full sm:w-auto rounded-md border border-gray-300 px-5 py-3 text-lg text-gray-700 hover:bg-gray-100">Read aloud</button>
+                <button onClick={() => stopReading()} disabled={!reading} className="w-full sm:w-auto rounded-md border border-gray-300 px-5 py-3 text-lg text-gray-700 disabled:opacity-40 hover:bg-gray-100">Stop</button>
                 <button onClick={next} disabled={idx === scenes.length - 1} className="w-full sm:w-auto rounded-md bg-indigo-600 text-white px-5 py-3 text-lg disabled:opacity-40 hover:bg-indigo-500">Next</button>
               </div>
             </div>
           </div>
         </div>
       </section>
+
     </main>
   );
 }

@@ -2,14 +2,21 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 
 const SELFIE_KEY = "selfie_v1";
+const STORY_PROMPT_KEY = "story_prompt_v1";
+
 
 export default function PlayPage() {
   const [loading, setLoading] = useState(false);
   const [url, setUrl] = useState(null);
 
-  // Selfie capture state
+  // Story idea input (Step 1)
+  const [storyPrompt, setStoryPrompt] = useState("");
+  const canProceed = (storyPrompt || "").trim().length > 0;
+
+  // Selfie capture state (Step 2)
   const [cameraOn, setCameraOn] = useState(false);
   const [cameraError, setCameraError] = useState("");
   const [selfie, setSelfie] = useState(null); // data URL
@@ -74,13 +81,15 @@ export default function PlayPage() {
 
 
   useEffect(() => {
-    // Prefill selfie from localStorage, if present
+    // Prefill selfie and any saved story prompt from localStorage
     try {
       const raw = localStorage.getItem(SELFIE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
         if (parsed?.url) setSelfie(parsed);
       }
+      const rawPrompt = localStorage.getItem(STORY_PROMPT_KEY);
+      if (rawPrompt) setStoryPrompt(rawPrompt);
     } catch {}
 
     return () => {
@@ -88,6 +97,11 @@ export default function PlayPage() {
       try { stopCamera(); } catch {}
     };
   }, []);
+
+  // Persist story idea as it changes
+  useEffect(() => {
+    try { localStorage.setItem(STORY_PROMPT_KEY, storyPrompt || ""); } catch {}
+  }, [storyPrompt]);
 
   const loadCharacter = async () => {
     setLoading(true);
@@ -103,18 +117,64 @@ export default function PlayPage() {
     }
   };
 
+  // Redirect this legacy /play page to the new 2-step flow
+  const router = useRouter();
+  useEffect(() => {
+    try { router.replace("/play/idea"); } catch {}
+  }, [router]);
+
+  // Early return with a simple fallback UI
+  return (
+    <main className="min-h-screen bg-white">
+      <section className="px-6 sm:px-10 md:px-16 py-10">
+        <h1 className="text-2xl font-semibold">Play</h1>
+        <p className="mt-2 text-sm text-gray-600">Redirecting to Step 1…</p>
+        <div className="mt-4">
+          <Link href="/play/idea" className="text-indigo-600 underline">Go to Step 1</Link>
+        </div>
+      </section>
+    </main>
+  );
+
   return (
     <main className="min-h-screen bg-white">
       <section className="px-6 sm:px-10 md:px-16 py-10 border-b bg-gradient-to-b from-white to-gray-50">
         <h1 className="text-3xl sm:text-4xl font-bold">Play</h1>
-        <p className="mt-2 text-gray-600">Capture a selfie below, then continue to play. Your photo stays on this device in the MVP.</p>
+        <p className="mt-2 text-gray-600">First, describe your story idea. Then take a selfie to star in your story. Your photo stays on this device in the MVP.</p>
         <div className="mt-6 flex flex-col sm:flex-row flex-wrap gap-3">
           <Link href="/" className="w-full sm:w-auto text-center rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Back to home</Link>
-          <Link href="/story" className="w-full sm:w-auto text-center rounded-md bg-indigo-600 text-white px-4 py-2 text-sm hover:bg-indigo-500">Start adventure</Link>
         </div>
       </section>
+
+      {/* Your story idea */}
+      <section className="px-6 sm:px-10 md:px-16 py-8">
+        <div className="mx-auto max-w-5xl">
+          <div className="rounded-xl border bg-white p-4 sm:p-6">
+            <h2 className="text-lg sm:text-xl font-semibold">Your story idea</h2>
+            <p className="mt-1 text-sm text-gray-600">Describe the kind of story you&apos;d like to create (e.g., &quot;a friendly robot helps me explore a candy planet&quot;).</p>
+            <div className="mt-4 flex flex-col sm:flex-row gap-2">
+              <input
+                value={storyPrompt}
+                onChange={(e) => setStoryPrompt(e.target.value)}
+                placeholder="Type your idea..."
+                className="flex-1 rounded-md border px-3 py-2 text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => { const el = document.getElementById('selfie'); if (el) el.scrollIntoView({ behavior: 'smooth' }); }}
+                disabled={!canProceed}
+                className="w-full sm:w-auto text-center rounded-md bg-indigo-600 text-white px-4 py-2 text-sm hover:bg-indigo-500 disabled:opacity-50"
+              >
+                Next: Take a selfie
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Selfie capture */}
-      <section className="px-6 sm:px-10 md:px-16 py-10">
+      {canProceed ? (
+      <section id="selfie" className="px-6 sm:px-10 md:px-16 py-8">
         <div className="mx-auto max-w-5xl">
           <h2 className="text-xl font-semibold">Selfie capture</h2>
           <p className="mt-2 text-sm text-gray-600">Grant camera access to capture a single photo. Nothing is uploaded.</p>
@@ -143,6 +203,10 @@ export default function PlayPage() {
                 style={{ width: "100%", height: "auto" }}
               />
               <canvas ref={canvasRef} className="hidden" />
+              {cameraOn && (
+                <p className="mt-2 text-xs text-gray-500">Tip: Smile and center your face in the frame. Ask a grown-up for help if needed.</p>
+              )}
+
             </div>
 
             <div>
@@ -158,40 +222,38 @@ export default function PlayPage() {
               {selfie && (
                 <div className="mt-3">
                   <button onClick={clearSelfie} className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100">Retake</button>
+
                 </div>
               )}
             </div>
           </div>
+          <div className="mt-6">
+            <Link
+              href={{ pathname: "/story", query: canProceed ? { prompt: storyPrompt } : {} }}
+              onClick={() => { try { localStorage.setItem(STORY_PROMPT_KEY, storyPrompt || ""); } catch {} }}
+              className="inline-block rounded-md bg-indigo-600 text-white px-4 py-2 text-sm hover:bg-indigo-500"
+            >
+              Start adventure
+            </Link>
+          </div>
+
         </div>
       </section>
-
-
-      <section className="px-6 sm:px-10 md:px-16 py-10">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-          <div>
-            <h2 className="text-xl font-semibold">Character preview</h2>
-            <p className="mt-2 text-sm text-gray-600">This is a temporary preview using a placeholder asset.</p>
-            <div className="mt-4">
-              {selfie ? (
-                <Image src={selfie.url} alt="your character" width={selfie.w || 256} height={selfie.h || 256} className="w-48 sm:w-56 md:w-64 h-auto rounded border" />
-              ) : url ? (
-                <Image src={url} alt="placeholder head" width={256} height={256} className="w-48 sm:w-56 md:w-64 h-auto rounded border" />
-              ) : (
-                <div className="w-64 h-40 border rounded flex items-center justify-center text-gray-400">No character loaded</div>
-              )}
-            </div>
-          </div>
-          <div>
-            <h2 className="text-xl font-semibold">Planned steps</h2>
-            <ol className="mt-2 space-y-3 text-sm text-gray-700">
-              <li className="rounded border p-3">1. Selfie capture with camera permissions</li>
-              <li className="rounded border p-3">2. Local-only processing and controls</li>
-              <li className="rounded border p-3">3. Story scenes with your character composited</li>
-            </ol>
+) : (
+      <section className="px-6 sm:px-10 md:px-16 py-8">
+        <div className="mx-auto max-w-5xl">
+          <div className="rounded-xl border bg-white p-4 text-sm text-gray-600">
+            First, describe your story idea above. Then we&apos;ll ask for a selfie so you can star in it!
           </div>
         </div>
       </section>
+      )}
+
+
+
+
     </main>
   );
 }
+
 
