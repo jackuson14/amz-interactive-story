@@ -42,16 +42,16 @@ export default function StoriesPage() {
                 </div>
               </div>
               <p className="mt-3 text-sm text-gray-700 line-clamp-3">{s.blurb}</p>
-              <div className="mt-4 flex gap-2">
+              <div className="mt-4 flex flex-col sm:flex-row gap-2">
                 <Link
                   href={{ pathname: "/story", query: { story: s.id } }}
-                  className="rounded-md bg-indigo-600 text-white px-3 py-2 text-sm hover:bg-indigo-500"
+                  className="w-full sm:w-auto text-center rounded-md bg-indigo-600 text-white px-3 py-2 text-sm hover:bg-indigo-500"
                 >
                   Start
                 </Link>
                 <Link
                   href={{ pathname: "/story", query: { story: s.id } }}
-                  className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                  className="w-full sm:w-auto text-center rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
                 >
                   Preview
                 </Link>

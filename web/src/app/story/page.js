@@ -73,16 +73,16 @@ export default function StoryPage() {
         <div className="mx-auto max-w-5xl">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
             {/* Left: Visual */}
-            <div className={`relative overflow-hidden rounded-xl border bg-gradient-to-br ${current.bg}`} style={{ minHeight: 360 }}>
+            <div className={`relative overflow-hidden rounded-xl border bg-gradient-to-br ${current.bg} min-h-[260px] md:min-h-[360px]`}>
               <div className="absolute inset-0 opacity-40">
                 <div className="w-48 h-48 rounded-full bg-white/60 blur-2xl absolute -top-10 -left-10" />
                 <div className="w-56 h-56 rounded-full bg-white/40 blur-2xl absolute bottom-0 right-0" />
               </div>
               <div className="absolute left-1/2 -translate-x-1/2 bottom-6">
                 {selfie ? (
-                  <Image src={selfie.url} alt="you" width={192} height={192} className="w-48 h-auto rounded-lg shadow-lg ring-1 ring-black/10" unoptimized />
+                  <Image src={selfie.url} alt="you" width={192} height={192} className="w-32 sm:w-40 md:w-48 h-auto rounded-lg shadow-lg ring-1 ring-black/10" unoptimized />
                 ) : (
-                  <Image src="/placeholder-head.svg" alt="placeholder" width={192} height={192} className="w-48 h-auto rounded-lg shadow-lg ring-1 ring-black/10" />
+                  <Image src="/placeholder-head.svg" alt="placeholder" width={192} height={192} className="w-32 sm:w-40 md:w-48 h-auto rounded-lg shadow-lg ring-1 ring-black/10" />
                 )}
               </div>
             </div>
@@ -90,12 +90,12 @@ export default function StoryPage() {
             {/* Right: Big readable text */}
             <div className="flex flex-col justify-between">
               <div>
-                <h2 className="text-3xl font-extrabold">{current.title}</h2>
-                <p className="mt-4 text-xl leading-relaxed text-gray-800">{current.text}</p>
+                <h2 className="text-2xl md:text-3xl font-extrabold">{current.title}</h2>
+                <p className="mt-4 text-lg md:text-xl leading-relaxed text-gray-800">{current.text}</p>
               </div>
-              <div className="mt-8 flex items-center gap-3">
-                <button onClick={prev} disabled={idx === 0} className="rounded-md border border-gray-300 px-5 py-3 text-lg text-gray-700 disabled:opacity-40 hover:bg-gray-100">Previous</button>
-                <button onClick={next} disabled={idx === scenes.length - 1} className="rounded-md bg-indigo-600 text-white px-5 py-3 text-lg disabled:opacity-40 hover:bg-indigo-500">Next</button>
+              <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <button onClick={prev} disabled={idx === 0} className="w-full sm:w-auto rounded-md border border-gray-300 px-5 py-3 text-lg text-gray-700 disabled:opacity-40 hover:bg-gray-100">Previous</button>
+                <button onClick={next} disabled={idx === scenes.length - 1} className="w-full sm:w-auto rounded-md bg-indigo-600 text-white px-5 py-3 text-lg disabled:opacity-40 hover:bg-indigo-500">Next</button>
               </div>
             </div>
           </div>

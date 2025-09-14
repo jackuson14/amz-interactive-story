@@ -108,12 +108,12 @@ export default function PlayPage() {
       <section className="px-6 sm:px-10 md:px-16 py-10 border-b bg-gradient-to-b from-white to-gray-50">
         <h1 className="text-3xl sm:text-4xl font-bold">Play</h1>
         <p className="mt-2 text-gray-600">Capture a selfie below, then continue to play. Your photo stays on this device in the MVP.</p>
-        <div className="mt-6 flex flex-wrap gap-3">
-          <Link href="/" className="rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Back to home</Link>
-          <button onClick={loadCharacter} className="rounded-md bg-black text-white px-4 py-2 text-sm hover:opacity-90">
+        <div className="mt-6 flex flex-col sm:flex-row flex-wrap gap-3">
+          <Link href="/" className="w-full sm:w-auto text-center rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Back to home</Link>
+          <button onClick={loadCharacter} className="w-full sm:w-auto rounded-md bg-black text-white px-4 py-2 text-sm hover:opacity-90">
             {loading ? "Loading..." : "Load placeholder character"}
           </button>
-          <Link href="/stories" className="rounded-md bg-indigo-600 text-white px-4 py-2 text-sm hover:bg-indigo-500">
+          <Link href="/stories" className="w-full sm:w-auto text-center rounded-md bg-indigo-600 text-white px-4 py-2 text-sm hover:bg-indigo-500">
             Continue
           </Link>
         </div>
@@ -131,11 +131,11 @@ export default function PlayPage() {
           <div className="mt-5 flex flex-wrap items-start gap-6">
             <div className="flex flex-col gap-3">
               {!cameraOn ? (
-                <button onClick={startCamera} className="rounded-md bg-black text-white px-4 py-2 text-sm hover:opacity-90 w-fit">Start camera</button>
+                <button onClick={startCamera} className="w-full sm:w-fit rounded-md bg-black text-white px-4 py-2 text-sm hover:opacity-90">Start camera</button>
               ) : (
-                <div className="flex items-center gap-3">
-                  <button onClick={captureFrame} className="rounded-md bg-black text-white px-4 py-2 text-sm hover:opacity-90">Capture</button>
-                  <button onClick={stopCamera} className="rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Stop</button>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                  <button onClick={captureFrame} className="w-full sm:w-auto rounded-md bg-black text-white px-4 py-2 text-sm hover:opacity-90">Capture</button>
+                  <button onClick={stopCamera} className="w-full sm:w-auto rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Stop</button>
                 </div>
               )}
 
@@ -144,8 +144,8 @@ export default function PlayPage() {
                 autoPlay
                 playsInline
                 muted
-                className={`mt-2 rounded border bg-black ${cameraOn ? "block" : "hidden"}`}
-                style={{ width: 320, height: 240 }}
+                className={`mt-2 rounded border bg-black w-full max-w-sm ${cameraOn ? "block" : "hidden"}`}
+                style={{ width: "100%", height: "auto" }}
               />
               <canvas ref={canvasRef} className="hidden" />
             </div>
@@ -155,7 +155,7 @@ export default function PlayPage() {
               <p className="text-xs text-gray-500">Preview of your selfie (local only)</p>
               <div className="mt-2">
                 {selfie ? (
-                  <Image src={selfie.url} alt="captured selfie" width={selfie.w || 256} height={selfie.h || 256} className="w-64 h-auto rounded border" />
+                  <Image src={selfie.url} alt="captured selfie" width={selfie.w || 256} height={selfie.h || 256} className="w-48 sm:w-56 md:w-64 h-auto rounded border" />
                 ) : (
                   <div className="w-64 h-40 border rounded flex items-center justify-center text-gray-400">No selfie yet</div>
                 )}
@@ -178,9 +178,9 @@ export default function PlayPage() {
             <p className="mt-2 text-sm text-gray-600">This is a temporary preview using a placeholder asset.</p>
             <div className="mt-4">
               {selfie ? (
-                <Image src={selfie.url} alt="your character" width={selfie.w || 256} height={selfie.h || 256} className="w-64 h-auto rounded border" />
+                <Image src={selfie.url} alt="your character" width={selfie.w || 256} height={selfie.h || 256} className="w-48 sm:w-56 md:w-64 h-auto rounded border" />
               ) : url ? (
-                <Image src={url} alt="placeholder head" width={256} height={256} className="w-64 h-auto rounded border" />
+                <Image src={url} alt="placeholder head" width={256} height={256} className="w-48 sm:w-56 md:w-64 h-auto rounded border" />
               ) : (
                 <div className="w-64 h-40 border rounded flex items-center justify-center text-gray-400">No character loaded</div>
               )}
