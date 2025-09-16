@@ -164,7 +164,7 @@ export default function StoryPage() {
     <main className="min-h-screen bg-white">
       <section className="px-6 sm:px-10 md:px-16 py-6 border-b bg-gradient-to-b from-white to-gray-50 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold">Your Story</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Your Story</h1>
           <p className="text-gray-600 text-sm">Sample: {storyTitle}</p>
         </div>
         <div className="flex gap-2">
@@ -194,7 +194,7 @@ export default function StoryPage() {
             {/* Right: Big readable text */}
             <div className="flex flex-col justify-between">
               <div>
-                <h2 className="text-2xl md:text-3xl font-extrabold">{current.title}</h2>
+                <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900">{current.title}</h2>
                 <p className="mt-4 text-lg md:text-xl leading-relaxed text-gray-800">{current.text}</p>
               </div>
               <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
