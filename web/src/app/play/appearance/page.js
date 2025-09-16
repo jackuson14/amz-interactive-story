@@ -222,27 +222,33 @@ export default function PlayAppearancePage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <button
                   onClick={() => setCharacterType("selfie")}
-                  className={`p-6 rounded-xl border-2 text-left transition-all ${
+                  className={`p-8 rounded-2xl border-3 text-left transition-all duration-200 transform hover:scale-105 ${
                     characterType === "selfie"
-                      ? "border-indigo-600 bg-indigo-50 text-indigo-700"
-                      : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                      ? "border-orange-400 bg-gradient-to-br from-orange-50 to-yellow-50 shadow-lg"
+                      : "border-gray-200 bg-white hover:border-orange-200 shadow-md hover:shadow-lg"
                   }`}
                 >
-                  <div className="text-4xl mb-3">📸</div>
-                  <h3 className="text-lg font-semibold mb-2 text-gray-900">Use My Photo</h3>
-                  <p className="text-sm text-gray-800">Take a selfie to appear as yourself in the story</p>
+                  <div className="text-5xl mb-4">📸</div>
+                  <h3 className="text-xl font-bold mb-3 text-gray-900">Use My Photo</h3>
+                  <p className="text-gray-700">Take a selfie to appear as yourself in the story!</p>
+                  {characterType === "selfie" && (
+                    <div className="mt-3 text-orange-600 font-medium text-sm">✓ Selected!</div>
+                  )}
                 </button>
                 <button
                   onClick={() => setCharacterType("preset")}
-                  className={`p-6 rounded-xl border-2 text-left transition-all ${
+                  className={`p-8 rounded-2xl border-3 text-left transition-all duration-200 transform hover:scale-105 ${
                     characterType === "preset"
-                      ? "border-indigo-600 bg-indigo-50 text-indigo-700"
-                      : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                      ? "border-green-400 bg-gradient-to-br from-green-50 to-blue-50 shadow-lg"
+                      : "border-gray-200 bg-white hover:border-green-200 shadow-md hover:shadow-lg"
                   }`}
                 >
-                  <div className="text-4xl mb-3">🎭</div>
-                  <h3 className="text-lg font-semibold mb-2">Choose Character</h3>
-                  <p className="text-sm text-gray-800">Pick from our collection of fun characters</p>
+                  <div className="text-5xl mb-4">🎭</div>
+                  <h3 className="text-xl font-bold mb-3 text-gray-900">Choose Character</h3>
+                  <p className="text-gray-700">Pick from our collection of fun characters!</p>
+                  {characterType === "preset" && (
+                    <div className="mt-3 text-green-600 font-medium text-sm">✓ Selected!</div>
+                  )}
                 </button>
               </div>
             </div>
