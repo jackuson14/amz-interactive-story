@@ -166,7 +166,7 @@ export default function DesignSystemPage() {
       <section className="px-6 sm:px-10 md:px-16 py-10 border-b bg-gradient-to-r from-orange-50 to-yellow-50">
         <h1 className="text-4xl font-bold text-gray-900 mb-4">Design System</h1>
         <p className="text-lg text-gray-700 max-w-3xl">
-          Inspired by Headspace's warm, welcoming, and mindful design philosophy. 
+          Inspired by Headspace&apos;s warm, welcoming, and mindful design philosophy.
           This design system emphasizes accessibility, joy, and calm through vibrant yet soothing colors.
         </p>
       </section>

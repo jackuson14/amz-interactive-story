@@ -41,8 +41,8 @@ export default function PlayCharacterPage() {
         <div className="absolute top-4 right-8 w-12 h-12 bg-gradient-to-br from-orange-400 to-orange-500 rounded-full opacity-20"></div>
         <div className="absolute bottom-4 left-8 w-16 h-16 bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-2xl opacity-30 rotate-12"></div>
         <div className="relative z-10">
-          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">🎭 Let's Get Started!</h1>
-          <p className="text-lg text-gray-700">Step 1 of 3: Tell us about yourself. Then you'll create your character and choose your story!</p>
+          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">🎭 Let&apos;s Get Started!</h1>
+          <p className="text-lg text-gray-700">Step 1 of 3: Tell us about yourself. Then you&apos;ll create your character and choose your story!</p>
         </div>
         <div className="mt-6 flex flex-col sm:flex-row flex-wrap gap-3">
           <Link href="/" className="w-full sm:w-auto text-center rounded-full bg-white border border-orange-200 px-6 py-3 text-sm text-orange-600 font-medium hover:bg-orange-50 transition-colors shadow-sm">🏠 Back to home</Link>
@@ -67,7 +67,7 @@ export default function PlayCharacterPage() {
               <div>
                 <div className="bg-gradient-to-r from-orange-50 to-yellow-50 rounded-2xl p-6">
                   <label htmlFor="character-name" className="block text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                    🌟 What's your name?
+                    🌟 What&apos;s your name?
                   </label>
                   <input
                     id="character-name"
@@ -110,7 +110,7 @@ export default function PlayCharacterPage() {
                     Hi <span className="text-green-600">{characterName}</span>! 
                   </p>
                   <p className="text-lg text-gray-700 mb-3">
-                    You're {characterAge} years old and ready for adventure!
+                    You&apos;re {characterAge} years old and ready for adventure!
                   </p>
                   <p className="text-sm text-green-700 bg-white rounded-full px-4 py-2 inline-block">
                     ✨ Next: Create your character appearance

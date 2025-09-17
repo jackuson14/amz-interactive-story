@@ -103,7 +103,7 @@ export default function PlayIdeaPage() {
             {!PRESET_STORIES_BY_AGE[characterAge] && characterAge && (
               <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                 <p className="text-sm text-yellow-800">
-                  We don't have specific stories for {characterAge} year olds yet, so here are some great stories for 4 year olds!
+                  We don&apos;t have specific stories for {characterAge} year olds yet, so here are some great stories for 4 year olds!
                 </p>
               </div>
             )}

@@ -1,7 +1,7 @@
 "use client";
 export const dynamic = 'force-dynamic';
 
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { SAMPLE_STORIES } from "@/data/stories";
@@ -75,7 +75,7 @@ export default function StoryPage() {
   const next = () => setIdx((v) => Math.min(v + 1, scenes.length - 1));
   const prev = () => setIdx((v) => Math.max(v - 1, 0));
   // Generate a simple 3-scene story from the prompt (local mock)
-  const handleGenerate = (ideaArg) => {
+  const handleGenerate = useCallback((ideaArg) => {
     const idea = (ideaArg ?? prompt ?? "").trim();
     if (!idea) return;
 
@@ -88,7 +88,7 @@ export default function StoryPage() {
     setIdx(0);
     setPrompt("");
 
-  };
+  }, [prompt]);
 
   // Auto-generate from ?prompt or saved prompt (runs once)
   useEffect(() => {
@@ -105,7 +105,7 @@ export default function StoryPage() {
         autoGenDone.current = true;
       }
     } catch {}
-  }, [customScenes, messages.length]);
+  }, [customScenes, messages.length, handleGenerate]);
 
   // Read-aloud helpers
   const speakCurrent = () => {

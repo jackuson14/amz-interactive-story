@@ -192,7 +192,7 @@ export default function PlayAppearancePage() {
       };
       localStorage.setItem(CHARACTER_KEY, JSON.stringify(characterData));
     } catch {}
-  }, [characterType, selectedPresetCharacter]);
+  }, [characterType, selectedPresetCharacter, characterName, characterAge]);
 
   const canProceed = (characterType === "selfie" && selfie) || (characterType === "preset" && selectedPresetCharacter);
 
