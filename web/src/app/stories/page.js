@@ -22,7 +22,7 @@ export default function StoriesPage() {
     <main className="min-h-screen bg-white">
       <section className="px-6 sm:px-10 md:px-16 py-6 border-b bg-gradient-to-b from-white to-gray-50 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold">Choose a Sample Story</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Choose a Sample Story</h1>
           <p className="text-gray-600 text-sm">Pick a story to play. Your selfie {hasSelfie ? "will" : "can"} be composited as the character.</p>
         </div>
         <div className="flex gap-2">
@@ -37,7 +37,7 @@ export default function StoriesPage() {
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded bg-gradient-to-br from-indigo-100 via-sky-100 to-emerald-100" />
                 <div>
-                  <h3 className="font-semibold">{s.title}</h3>
+                  <h3 className="font-semibold text-gray-900">{s.title}</h3>
                   <p className="text-xs text-gray-500">{s.scenes.length} scenes</p>
                 </div>
               </div>
