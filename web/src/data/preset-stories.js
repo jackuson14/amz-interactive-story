@@ -63,6 +63,14 @@ export const PRESET_STORIES_BY_AGE = {
       oneLiner: "Join a choir of friendly birds for a musical forest concert",
       thumbnail: "🐦",
       color: "from-green-100 to-emerald-100"
+    },
+    {
+      id: "lost-smile-5",
+      title: "Lily's Lost Smile",
+      oneLiner: "Help Lily find her missing smile by spreading happiness to others",
+      description: "Lily wakes up one morning to discover her bright, sparkly smile has disappeared! Join her adventure as she searches everywhere - from the garden to the park - and discovers that the best way to find your smile is by sharing happiness with others who need it most.",
+      thumbnail: "😊",
+      color: "from-rose-100 to-pink-100"
     }
   ],
   6: [

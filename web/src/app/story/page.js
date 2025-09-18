@@ -32,8 +32,13 @@ export default function StoryPage() {
     try {
       const qs = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
       const id = qs ? qs.get('story') : null;
+      const prompt = qs ? qs.get('prompt') : null;
+      
       if (id) {
         setStoryId(id);
+      } else if (prompt && prompt.includes("Lily's Lost Smile")) {
+        // If the prompt mentions Lily's Lost Smile, load that specific story
+        setStoryId("lily-lost-smile");
       } else {
         const list = SAMPLE_STORIES;
         if (list?.length) {
@@ -45,6 +50,10 @@ export default function StoryPage() {
   }, []);
 
   const storyTitle = useMemo(() => {
+    // For Lily's Lost Smile, always use the predefined title
+    if (storyId === "lily-lost-smile") {
+      return "Lily's Lost Smile";
+    }
     if (customScenes) return "Your story";
     const f = SAMPLE_STORIES.find((s) => s.id === storyId);
     return f?.title ?? "Default";
@@ -96,6 +105,19 @@ export default function StoryPage() {
     try {
       const qs = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
       let p = qs ? qs.get('prompt') : null;
+      
+      // Skip auto-generation if we're loading a specific predefined story
+      if (p && p.includes("Lily's Lost Smile")) {
+        autoGenDone.current = true;
+        return;
+      }
+      
+      // Skip auto-generation if we have a predefined story loaded
+      if (storyId && storyId !== null) {
+        autoGenDone.current = true;
+        return;
+      }
+      
       if (!p && typeof window !== 'undefined') {
         try { p = localStorage.getItem('story_prompt_v1') || null; } catch {}
       }
@@ -105,7 +127,7 @@ export default function StoryPage() {
         autoGenDone.current = true;
       }
     } catch {}
-  }, [customScenes, messages.length, handleGenerate]);
+  }, [customScenes, messages.length, handleGenerate, storyId]);
 
   // Read-aloud helpers
   const speakCurrent = () => {
@@ -179,16 +201,44 @@ export default function StoryPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
             {/* Left: Visual */}
             <div className={`relative overflow-hidden rounded-xl border bg-gradient-to-br ${current.bg} min-h-[260px] md:min-h-[360px]`}>
-
-              <div className="absolute inset-0 opacity-40">
-                <div className="w-48 h-48 rounded-full bg-white/60 blur-2xl absolute -top-10 -left-10" />
-                <div className="w-56 h-56 rounded-full bg-white/40 blur-2xl absolute bottom-0 right-0" />
-              </div>
-              <div className="absolute left-1/2 -translate-x-1/2 bottom-6">
-                {selfie && (
-                  <Image src={selfie.url} alt="you" width={192} height={192} className="w-32 sm:w-40 md:w-48 h-auto rounded-lg shadow-lg ring-1 ring-black/10" unoptimized />
-                )}
-              </div>
+              {current.image ? (
+                // Story has an image - show it as the main visual
+                <div className="relative h-full">
+                  <Image 
+                    src={current.image} 
+                    alt={current.title} 
+                    fill
+                    className="object-cover rounded-xl"
+                    unoptimized 
+                  />
+                  {/* Optional overlay for user selfie in corner */}
+                  {selfie && (
+                    <div className="absolute bottom-4 right-4">
+                      <Image 
+                        src={selfie.url} 
+                        alt="you" 
+                        width={80} 
+                        height={80} 
+                        className="w-16 h-16 sm:w-20 sm:h-20 rounded-full shadow-lg ring-2 ring-white/80" 
+                        unoptimized 
+                      />
+                    </div>
+                  )}
+                </div>
+              ) : (
+                // No story image - use original gradient design
+                <>
+                  <div className="absolute inset-0 opacity-40">
+                    <div className="w-48 h-48 rounded-full bg-white/60 blur-2xl absolute -top-10 -left-10" />
+                    <div className="w-56 h-56 rounded-full bg-white/40 blur-2xl absolute bottom-0 right-0" />
+                  </div>
+                  <div className="absolute left-1/2 -translate-x-1/2 bottom-6">
+                    {selfie && (
+                      <Image src={selfie.url} alt="you" width={192} height={192} className="w-32 sm:w-40 md:w-48 h-auto rounded-lg shadow-lg ring-1 ring-black/10" unoptimized />
+                    )}
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Right: Big readable text */}
