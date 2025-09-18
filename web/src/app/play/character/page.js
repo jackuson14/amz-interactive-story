@@ -92,13 +92,10 @@ export default function PlayCharacterPage() {
                     className="w-full rounded-xl border-2 border-blue-200 px-6 py-4 text-lg text-gray-900 focus:border-blue-400 focus:ring-2 focus:ring-blue-200 bg-white shadow-sm transition-all"
                   >
                     <option value="">Pick your age! 🎈</option>
-                    <option value="4">4 years old 🌱</option>
-                    <option value="5">5 years old 🌟</option>
-                    <option value="6">6 years old 🚀</option>
-                    <option value="7">7 years old ⭐</option>
-                    <option value="8">8 years old 🎯</option>
-                    <option value="9">9 years old 🏆</option>
-                    <option value="10">10 years old 👑</option>
+                    <option value="3">3 years old 🌱</option>
+                    <option value="4">4 years old 🌟</option>
+                    <option value="5">5 years old 🚀</option>
+                    <option value="6">6 years old ⭐</option>
                   </select>
                 </div>
               </div>
