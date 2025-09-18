@@ -117,10 +117,10 @@ export default function PlayPage() {
     }
   };
 
-  // Redirect this legacy /play page to the new 2-step flow
+  // Redirect this legacy /play page to the new 3-step flow (name/age, appearance, story)
   const router = useRouter();
   useEffect(() => {
-    try { router.replace("/play/idea"); } catch {}
+    try { router.replace("/play/character"); } catch {}
   }, [router]);
 
   // Early return with a simple fallback UI
@@ -128,9 +128,9 @@ export default function PlayPage() {
     <main className="min-h-screen bg-white">
       <section className="px-6 sm:px-10 md:px-16 py-10">
         <h1 className="text-2xl font-semibold">Play</h1>
-        <p className="mt-2 text-sm text-gray-600">Redirecting to Step 1…</p>
+        <p className="mt-2 text-sm text-gray-600">Redirecting to Step 1 (About You)…</p>
         <div className="mt-4">
-          <Link href="/play/idea" className="text-indigo-600 underline">Go to Step 1</Link>
+          <Link href="/play/character" className="text-indigo-600 underline">Go to Step 1</Link>
         </div>
       </section>
     </main>
@@ -157,7 +157,7 @@ export default function PlayPage() {
                 value={storyPrompt}
                 onChange={(e) => setStoryPrompt(e.target.value)}
                 placeholder="Type your idea..."
-                className="flex-1 rounded-md border px-3 py-2 text-sm"
+                className="flex-1 rounded-md border px-3 py-2 text-sm text-gray-900 placeholder-gray-500"
               />
               <button
                 type="button"

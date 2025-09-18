@@ -1,20 +1,25 @@
 "use client";
 export const dynamic = 'force-dynamic';
 
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { SAMPLE_STORIES } from "@/data/stories";
+import { parseMarkdownStory } from "@/utils/markdownParser";
 
 
 const SELFIE_KEY = "selfie_v1";
+const CHARACTER_KEY = "character_v1";
 
 export default function StoryPage() {
   const [selfie, setSelfie] = useState(null);
   const [idx, setIdx] = useState(0);
+  const [characterName, setCharacterName] = useState("Lily");
+  const [characterGender, setCharacterGender] = useState("girl");
 
   // Custom story and chat state
   const [customScenes, setCustomScenes] = useState(null);
+  const [markdownStory, setMarkdownStory] = useState(null);
 
   const [messages, setMessages] = useState([]); // {role:'user'|'assistant', text:string}
   const [prompt, setPrompt] = useState("");
@@ -32,8 +37,13 @@ export default function StoryPage() {
     try {
       const qs = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
       const id = qs ? qs.get('story') : null;
+      const prompt = qs ? qs.get('prompt') : null;
+      
       if (id) {
         setStoryId(id);
+      } else if (prompt && prompt.includes("Lily's Lost Smile")) {
+        // If the prompt mentions Lily's Lost Smile, load that specific story
+        setStoryId("lily-lost-smile");
       } else {
         const list = SAMPLE_STORIES;
         if (list?.length) {
@@ -45,21 +55,38 @@ export default function StoryPage() {
   }, []);
 
   const storyTitle = useMemo(() => {
+    // For The Lost Smile, just use the generic title
+    if (storyId === "lily-lost-smile") {
+      return "The Lost Smile";
+    }
     if (customScenes) return "Your story";
     const f = SAMPLE_STORIES.find((s) => s.id === storyId);
     return f?.title ?? "Default";
-  }, [storyId, customScenes]);
+  }, [storyId, customScenes, characterName]);
 
   const baseScenes = useMemo(
     () => {
       const f = SAMPLE_STORIES.find((s) => s.id === storyId);
-      if (f) return f.scenes;
+      if (f) {
+        // If it's a markdown story and we have parsed content, use that
+        if (f.isMarkdown && markdownStory) {
+          return markdownStory.scenes;
+        }
+        // If it's a markdown story but content isn't loaded yet, return empty array to wait
+        if (f.isMarkdown && !markdownStory) {
+          return [];
+        }
+        return f.scenes;
+      }
       const first = SAMPLE_STORIES[0];
       return first ? first.scenes : [];
     },
-    [storyId]
+    [storyId, markdownStory]
   );
   const scenes = customScenes ?? baseScenes;
+  
+  // Show loading state if we're waiting for markdown content
+  const isLoadingMarkdown = storyId && SAMPLE_STORIES.find(s => s.id === storyId)?.isMarkdown && !markdownStory;
 
   useEffect(() => {
     try {
@@ -69,13 +96,55 @@ export default function StoryPage() {
         if (parsed?.url) setSelfie(parsed);
       }
     } catch {}
+    
+    try {
+      const characterRaw = localStorage.getItem(CHARACTER_KEY);
+      if (characterRaw) {
+        const characterData = JSON.parse(characterRaw);
+        if (characterData?.name) setCharacterName(characterData.name);
+        if (characterData?.gender) setCharacterGender(characterData.gender);
+      }
+    } catch {}
   }, []);
+
+  // Load markdown story content
+  useEffect(() => {
+    const loadMarkdownStory = async () => {
+      console.log('loadMarkdownStory called with storyId:', storyId);
+      if (!storyId) return;
+      
+      const story = SAMPLE_STORIES.find((s) => s.id === storyId);
+      console.log('Found story:', story);
+      
+      if (story?.isMarkdown && story.markdownPath) {
+        console.log('Loading markdown from:', story.markdownPath);
+        try {
+          // Add cache-busting parameter to ensure fresh content
+          const cacheBuster = Date.now();
+          const response = await fetch(`${story.markdownPath}?v=${cacheBuster}`);
+          console.log('Fetch response status:', response.status);
+          const markdownContent = await response.text();
+          console.log('Markdown content length:', markdownContent.length);
+          const parsedStory = parseMarkdownStory(markdownContent, characterName, characterGender);
+          console.log('Parsed story:', parsedStory);
+          setMarkdownStory(parsedStory);
+        } catch (error) {
+          console.error('Failed to load markdown story:', error);
+        }
+      } else {
+        console.log('Not a markdown story or no path');
+        setMarkdownStory(null);
+      }
+    };
+
+    loadMarkdownStory();
+  }, [storyId, characterName, characterGender]);
 
   const current = scenes[idx];
   const next = () => setIdx((v) => Math.min(v + 1, scenes.length - 1));
   const prev = () => setIdx((v) => Math.max(v - 1, 0));
   // Generate a simple 3-scene story from the prompt (local mock)
-  const handleGenerate = (ideaArg) => {
+  const handleGenerate = useCallback((ideaArg) => {
     const idea = (ideaArg ?? prompt ?? "").trim();
     if (!idea) return;
 
@@ -88,7 +157,7 @@ export default function StoryPage() {
     setIdx(0);
     setPrompt("");
 
-  };
+  }, [prompt]);
 
   // Auto-generate from ?prompt or saved prompt (runs once)
   useEffect(() => {
@@ -96,6 +165,25 @@ export default function StoryPage() {
     try {
       const qs = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
       let p = qs ? qs.get('prompt') : null;
+      
+      // Skip auto-generation if we're loading a specific predefined story
+      if (p && p.includes("Lily's Lost Smile")) {
+        autoGenDone.current = true;
+        return;
+      }
+      
+      // Skip auto-generation if we have a predefined story loaded via storyId
+      if (storyId && storyId !== null) {
+        autoGenDone.current = true;
+        return;
+      }
+      
+      // Skip auto-generation if we have a story query parameter (means loading predefined story)
+      if (qs && qs.get('story')) {
+        autoGenDone.current = true;
+        return;
+      }
+      
       if (!p && typeof window !== 'undefined') {
         try { p = localStorage.getItem('story_prompt_v1') || null; } catch {}
       }
@@ -105,7 +193,7 @@ export default function StoryPage() {
         autoGenDone.current = true;
       }
     } catch {}
-  }, [customScenes, messages.length]);
+  }, [customScenes, messages.length, handleGenerate, storyId]);
 
   // Read-aloud helpers
   const speakCurrent = () => {
@@ -164,7 +252,7 @@ export default function StoryPage() {
     <main className="min-h-screen bg-white">
       <section className="px-6 sm:px-10 md:px-16 py-6 border-b bg-gradient-to-b from-white to-gray-50 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold">Your Story</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Your Story</h1>
           <p className="text-gray-600 text-sm">Sample: {storyTitle}</p>
         </div>
         <div className="flex gap-2">
@@ -176,25 +264,62 @@ export default function StoryPage() {
       {/* Scene viewport */}
       <section className="px-6 sm:px-10 md:px-16 py-8">
         <div className="mx-auto max-w-5xl">
+          {isLoadingMarkdown ? (
+            <div className="flex items-center justify-center py-20">
+              <div className="text-gray-600">Loading story...</div>
+            </div>
+          ) : scenes.length === 0 ? (
+            <div className="flex items-center justify-center py-20">
+              <div className="text-gray-600">No story content available</div>
+            </div>
+          ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
             {/* Left: Visual */}
             <div className={`relative overflow-hidden rounded-xl border bg-gradient-to-br ${current.bg} min-h-[260px] md:min-h-[360px]`}>
-
-              <div className="absolute inset-0 opacity-40">
-                <div className="w-48 h-48 rounded-full bg-white/60 blur-2xl absolute -top-10 -left-10" />
-                <div className="w-56 h-56 rounded-full bg-white/40 blur-2xl absolute bottom-0 right-0" />
-              </div>
-              <div className="absolute left-1/2 -translate-x-1/2 bottom-6">
-                {selfie && (
-                  <Image src={selfie.url} alt="you" width={192} height={192} className="w-32 sm:w-40 md:w-48 h-auto rounded-lg shadow-lg ring-1 ring-black/10" unoptimized />
-                )}
-              </div>
+              {current.image ? (
+                // Story has an image - show it as the main visual
+                <div className="relative h-full">
+                  <Image 
+                    src={current.image} 
+                    alt={current.title} 
+                    fill
+                    className="object-cover rounded-xl"
+                    unoptimized 
+                  />
+                  {/* Optional overlay for user selfie in corner */}
+                  {selfie && (
+                    <div className="absolute bottom-4 right-4">
+                      <Image 
+                        src={selfie.url} 
+                        alt="you" 
+                        width={80} 
+                        height={80} 
+                        className="w-16 h-16 sm:w-20 sm:h-20 rounded-full shadow-lg ring-2 ring-white/80" 
+                        unoptimized 
+                      />
+                    </div>
+                  )}
+                </div>
+              ) : (
+                // No story image - use original gradient design
+                <>
+                  <div className="absolute inset-0 opacity-40">
+                    <div className="w-48 h-48 rounded-full bg-white/60 blur-2xl absolute -top-10 -left-10" />
+                    <div className="w-56 h-56 rounded-full bg-white/40 blur-2xl absolute bottom-0 right-0" />
+                  </div>
+                  <div className="absolute left-1/2 -translate-x-1/2 bottom-6">
+                    {selfie && (
+                      <Image src={selfie.url} alt="you" width={192} height={192} className="w-32 sm:w-40 md:w-48 h-auto rounded-lg shadow-lg ring-1 ring-black/10" unoptimized />
+                    )}
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Right: Big readable text */}
             <div className="flex flex-col justify-between">
               <div>
-                <h2 className="text-2xl md:text-3xl font-extrabold">{current.title}</h2>
+                <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900">{current.title}</h2>
                 <p className="mt-4 text-lg md:text-xl leading-relaxed text-gray-800">{current.text}</p>
               </div>
               <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
@@ -205,6 +330,7 @@ export default function StoryPage() {
               </div>
             </div>
           </div>
+          )}
         </div>
       </section>
 
