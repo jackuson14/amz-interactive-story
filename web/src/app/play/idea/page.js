@@ -158,7 +158,12 @@ export default function PlayIdeaPage() {
               
               <div className="flex gap-3">
                 <Link
-                  href={{ pathname: "/story", query: { prompt: selectedStory ? `${selectedStory.title}: ${selectedStory.oneLiner}` : "" } }}
+                  href={{ 
+                    pathname: "/story", 
+                    query: selectedStory?.storyId 
+                      ? { story: selectedStory.storyId }
+                      : { prompt: selectedStory ? `${selectedStory.title}: ${selectedStory.oneLiner}` : "" }
+                  }}
                   onClick={handleChooseStory}
                   className="flex-1 bg-indigo-600 text-white text-center py-3 px-4 rounded-lg font-medium hover:bg-indigo-500 transition-colors"
                 >

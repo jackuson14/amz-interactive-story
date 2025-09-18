@@ -1,6 +1,15 @@
 export const PRESET_STORIES_BY_AGE = {
   4: [
     {
+      id: "lost-smile-4",
+      title: "The Lost Smile",
+      oneLiner: "Find your missing smile by spreading happiness to others",
+      description: "You wake up one morning to discover your bright, sparkly smile has disappeared! Join this adventure as you search everywhere - from the garden to the park - and discover that the best way to find your smile is by sharing happiness with others who need it most.",
+      thumbnail: "😊",
+      color: "from-rose-100 to-pink-100",
+      storyId: "lily-lost-smile"
+    },
+    {
       id: "bunny-friend-4",
       title: "My Bunny Friend",
       oneLiner: "Make friends with a fluffy bunny in a sunny garden",
@@ -66,11 +75,12 @@ export const PRESET_STORIES_BY_AGE = {
     },
     {
       id: "lost-smile-5",
-      title: "Lily's Lost Smile",
-      oneLiner: "Help Lily find her missing smile by spreading happiness to others",
-      description: "Lily wakes up one morning to discover her bright, sparkly smile has disappeared! Join her adventure as she searches everywhere - from the garden to the park - and discovers that the best way to find your smile is by sharing happiness with others who need it most.",
+      title: "The Lost Smile",
+      oneLiner: "Find your missing smile by spreading happiness to others",
+      description: "You wake up one morning to discover your bright, sparkly smile has disappeared! Join this adventure as you search everywhere - from the garden to the park - and discover that the best way to find your smile is by sharing happiness with others who need it most.",
       thumbnail: "😊",
-      color: "from-rose-100 to-pink-100"
+      color: "from-rose-100 to-pink-100",
+      storyId: "lily-lost-smile"
     }
   ],
   6: [

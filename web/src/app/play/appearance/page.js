@@ -53,18 +53,31 @@ const PRESET_CHARACTERS = [
   }
 ];
 
-// Function to get character image path based on age
-const getCharacterImagePath = (characterIndex, age) => {
+// Get available character images based on age and gender
+const getAvailableCharacterImages = (age, gender) => {
+  if (!gender || !age) return [];
+  
+  const genderPrefix = gender === "boy" ? "Male" : "Female";
+  
   if (age === "3" || age === "4") {
-    // Use all 6 available images (Artboard 1-6)
-    const imageNumber = (characterIndex % 6) + 1;
-    return `/images/3-4yo/Artboard ${imageNumber}.jpg`;
+    // For 3-4yo: Female-Artboard 1,3,5 and Male-Artboard 2,4,6
+    const artboardNumbers = gender === "girl" ? [1, 3, 5] : [2, 4, 6];
+    return artboardNumbers.map(num => ({
+      id: `${genderPrefix}-${num}`,
+      path: `/images/3-4yo/${genderPrefix}-Artboard ${num}.jpg`,
+      name: `Character ${num}`
+    }));
   } else if (age === "5" || age === "6") {
-    // Use all 6 available images (Artboard 7-12)
-    const imageNumber = (characterIndex % 6) + 7;
-    return `/images/5-6yo/Artboard ${imageNumber}.jpg`;
+    // For 5-6yo: Female-Artboard 8,10,12 and Male-Artboard 7,9,11  
+    const artboardNumbers = gender === "girl" ? [8, 10, 12] : [7, 9, 11];
+    return artboardNumbers.map(num => ({
+      id: `${genderPrefix}-${num}`,
+      path: `/images/5-6yo/${genderPrefix}-Artboard ${num}.jpg`,
+      name: `Character ${num}`
+    }));
   }
-  return null; // Use emoji for other ages
+  
+  return [];
 };
 
 export default function PlayAppearancePage() {
@@ -73,6 +86,7 @@ export default function PlayAppearancePage() {
   // Character info state
   const [characterName, setCharacterName] = useState("");
   const [characterAge, setCharacterAge] = useState("");
+  const [characterGender, setCharacterGender] = useState("");
   
   // Character type selection
   const [characterType, setCharacterType] = useState("selfie"); // "selfie" or "preset"
@@ -98,13 +112,15 @@ export default function PlayAppearancePage() {
         
         const name = characterData.name || "";
         const age = characterData.age || "";
+        const gender = characterData.gender || "";
         
         setCharacterName(name);
         setCharacterAge(age);
+        setCharacterGender(gender);
         setCharacterType(characterData.type || "selfie");
         setSelectedPresetCharacter(characterData.presetCharacter || null);
         
-        console.log("Loaded character data:", { name, age });
+        console.log("Loaded character data:", { name, age, gender });
         
         // TEMPORARILY DISABLE REDIRECT - let's see what's happening
         // if (!name.trim() || !age) {
@@ -190,23 +206,24 @@ export default function PlayAppearancePage() {
     };
   }, []);
 
-  // Save character data whenever appearance choices change (preserve existing name/age)
+  // Save character data whenever appearance choices change (preserve existing name/age/gender)
   useEffect(() => {
     try {
       // Get existing data
       const existingRaw = localStorage.getItem(CHARACTER_KEY);
       const existingData = existingRaw ? JSON.parse(existingRaw) : {};
       
-      // Merge with new appearance data, preserving name and age
+      // Merge with new appearance data, preserving name, age, and gender
       const characterData = { 
         name: existingData.name || characterName, 
         age: existingData.age || characterAge,
+        gender: existingData.gender || characterGender, // Preserve gender!
         type: characterType,
         presetCharacter: selectedPresetCharacter
       };
       localStorage.setItem(CHARACTER_KEY, JSON.stringify(characterData));
     } catch {}
-  }, [characterType, selectedPresetCharacter, characterName, characterAge]);
+  }, [characterType, selectedPresetCharacter, characterName, characterAge, characterGender]);
 
   const canProceed = (characterType === "selfie" && selfie) || (characterType === "preset" && selectedPresetCharacter);
 
@@ -345,33 +362,25 @@ export default function PlayAppearancePage() {
                   <span className="text-green-500">🌟</span> Choose Your Character
                 </h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-8">
-                  {PRESET_CHARACTERS.map((character, index) => (
+                  {getAvailableCharacterImages(characterAge, characterGender).map((characterImg) => (
                     <div
-                      key={character.id}
-                      onClick={() => setSelectedPresetCharacter(character)}
-                      className={`aspect-square rounded-2xl border-3 cursor-pointer transition-all transform hover:scale-105 hover:shadow-xl bg-gradient-to-br ${character.color} ${
-                        selectedPresetCharacter?.id === character.id
+                      key={characterImg.id}
+                      onClick={() => setSelectedPresetCharacter(characterImg)}
+                      className={`aspect-square rounded-2xl border-3 cursor-pointer transition-all transform hover:scale-105 hover:shadow-xl bg-gradient-to-br from-blue-50 to-purple-50 ${
+                        selectedPresetCharacter?.id === characterImg.id
                           ? "border-orange-500 ring-4 ring-orange-300 shadow-2xl scale-105"
                           : "border-white/50 hover:border-orange-300"
                       }`}
                     >
                       <div className="w-full h-full flex items-center justify-center">
-                        {getCharacterImagePath(index, characterAge) ? (
-                          <Image
-                            src={getCharacterImagePath(index, characterAge)}
-                            alt={character.name}
-                            width={200}
-                            height={200}
-                            className="rounded-lg object-cover w-full h-full"
-                            onError={(e) => {
-                              // Fallback to emoji if image fails to load
-                              e.target.style.display = 'none';
-                              e.target.nextElementSibling.style.display = 'block';
-                            }}
-                          />
-                        ) : (
-                          <div className="text-4xl">{character.emoji}</div>
-                        )}
+                        <Image
+                          src={characterImg.path}
+                          alt={characterImg.name}
+                          width={200}
+                          height={200}
+                          className="rounded-lg object-cover w-full h-full"
+                          unoptimized
+                        />
                       </div>
                     </div>
                   ))}
@@ -380,9 +389,9 @@ export default function PlayAppearancePage() {
                 {selectedPresetCharacter && (
                   <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
                     <p className="text-sm text-indigo-800">
-                      <strong>{selectedPresetCharacter.name}</strong> selected! {selectedPresetCharacter.emoji}
+                      <strong>{selectedPresetCharacter.name}</strong> selected! ✨
                     </p>
-                    <p className="text-xs text-indigo-600 mt-1">{selectedPresetCharacter.description}</p>
+                    <p className="text-xs text-indigo-600 mt-1">Perfect choice for your story adventure!</p>
                   </div>
                 )}
               </div>
