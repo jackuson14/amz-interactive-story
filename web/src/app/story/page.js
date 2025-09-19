@@ -28,6 +28,14 @@ export default function StoryPage() {
 
   // Read-aloud state
   const [reading, setReading] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+
+  // Voice recognition state
+  const [isListening, setIsListening] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const [recognizedText, setRecognizedText] = useState("");
+  const [voiceError, setVoiceError] = useState("");
+  const recognitionRef = useRef(null);
 
 
 
@@ -141,8 +149,86 @@ export default function StoryPage() {
   }, [storyId, characterName, characterGender]);
 
   const current = scenes[idx];
-  const next = () => setIdx((v) => Math.min(v + 1, scenes.length - 1));
+  const next = useCallback(() => setIdx((v) => Math.min(v + 1, scenes.length - 1)), [scenes.length]);
   const prev = () => setIdx((v) => Math.max(v - 1, 0));
+
+  // Initialize speech recognition
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        setSpeechSupported(true);
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'en-US';
+        
+        recognition.onresult = (event) => {
+          let transcript = '';
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            transcript += event.results[i][0].transcript;
+          }
+          setRecognizedText(transcript);
+          
+          // Check for keywords to progress story
+          const keywords = ['lion', 'monkey', 'penguin', 'hippo', 'goodnight', "let's go", 'lets go'];
+          const lowerTranscript = transcript.toLowerCase();
+          
+          for (const keyword of keywords) {
+            if (lowerTranscript.includes(keyword)) {
+              console.log('Keyword detected:', keyword);
+              // Progress to next scene
+              next();
+              // Stop listening after keyword detection
+              stopListening();
+              break;
+            }
+          }
+        };
+        
+        recognition.onerror = (event) => {
+          console.error('Speech recognition error:', event.error);
+          setVoiceError(`Speech recognition error: ${event.error}`);
+          setIsListening(false);
+        };
+        
+        recognition.onend = () => {
+          setIsListening(false);
+        };
+        
+        recognitionRef.current = recognition;
+      } else {
+        console.log('Speech recognition not supported');
+        setSpeechSupported(false);
+      }
+    }
+  }, [next]);
+  
+  // Start listening for voice commands
+  const startListening = () => {
+    if (!speechSupported || !recognitionRef.current) {
+      setVoiceError('Speech recognition not supported in this browser');
+      return;
+    }
+    
+    try {
+      setVoiceError('');
+      setRecognizedText('');
+      recognitionRef.current.start();
+      setIsListening(true);
+    } catch (error) {
+      console.error('Failed to start speech recognition:', error);
+      setVoiceError('Failed to start voice recognition');
+    }
+  };
+  
+  // Stop listening for voice commands
+  const stopListening = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+    setIsListening(false);
+  };
   // Generate a simple 3-scene story from the prompt (local mock)
   const handleGenerate = useCallback((ideaArg) => {
     const idea = (ideaArg ?? prompt ?? "").trim();
@@ -195,22 +281,58 @@ export default function StoryPage() {
     } catch {}
   }, [customScenes, messages.length, handleGenerate, storyId]);
 
-  // Read-aloud helpers
+  // Read-aloud helpers with play/pause support
   const speakCurrent = () => {
     try {
       if (typeof window === 'undefined') return;
       const s = window.speechSynthesis;
       if (!s || !current) return;
+      
+      // If paused, resume
+      if (isPaused) {
+        s.resume();
+        setIsPaused(false);
+        setReading(true);
+        return;
+      }
+      
+      // Start new speech
       const u = new SpeechSynthesisUtterance(`${current.title}. ${current.text}`);
       u.rate = 0.95; // slightly slower for kids
       u.pitch = 1.05; // a bit brighter
-      u.onend = () => { setReading(false); };
+      u.onend = () => { 
+        setReading(false); 
+        setIsPaused(false);
+        // Auto-start listening after read-aloud finishes
+        if (speechSupported && !isListening) {
+          setTimeout(() => {
+            startListening();
+          }, 500); // Small delay to ensure speech has fully ended
+        }
+      };
+      u.onpause = () => {
+        setIsPaused(true);
+        setReading(false);
+      };
       s.cancel();
       s.speak(u);
       setReading(true);
+      setIsPaused(false);
 
     } catch {}
   };
+
+  const pauseReading = () => {
+    try {
+      if (typeof window === 'undefined') return;
+      const s = window.speechSynthesis;
+      if (!s) return;
+      s.pause();
+      setIsPaused(true);
+      setReading(false);
+    } catch {}
+  };
+
   const stopReading = () => {
     try {
       if (typeof window === 'undefined') return;
@@ -218,7 +340,11 @@ export default function StoryPage() {
       if (!s) return;
       s.cancel();
       setReading(false);
-
+      setIsPaused(false);
+      // Stop listening when read-aloud is manually stopped
+      if (isListening) {
+        stopListening();
+      }
     } catch {}
   };
   // If reading, re-speak when scene changes
@@ -226,6 +352,22 @@ export default function StoryPage() {
     if (reading) speakCurrent();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idx, scenes]);
+
+  // Auto-play when story loads or scene changes
+  useEffect(() => {
+    if (current && !reading && !isPaused) {
+      // Stop any existing listening when scene changes
+      if (isListening) {
+        stopListening();
+      }
+      // Small delay to ensure page is ready
+      const timer = setTimeout(() => {
+        speakCurrent();
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [current, storyId]); // Trigger when current scene or story changes
 
 
   const randomizeStory = () => {
@@ -270,6 +412,18 @@ export default function StoryPage() {
             unoptimized
           />
           
+          {/* Back button - top left corner */}
+          <div className="absolute top-6 left-6 z-20">
+            <Link 
+              href="/play" 
+              className="w-12 h-12 bg-white/90 hover:bg-white backdrop-blur-sm rounded-full shadow-lg flex items-center justify-center text-gray-700 hover:text-gray-900 transition-all transform hover:scale-105"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </Link>
+          </div>
+          
           {/* Content overlay */}
           <div className="relative z-10 h-full flex">
             {/* Left side - character */}
@@ -297,9 +451,109 @@ export default function StoryPage() {
                 
                 {/* Navigation buttons */}
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                  <Link href="/play" className="w-full sm:w-auto rounded-md bg-white/90 border border-gray-300 px-5 py-3 text-lg text-gray-700 hover:bg-white text-center">Back</Link>
                   <button onClick={prev} disabled={idx === 0} className="w-full sm:w-auto rounded-md bg-white/90 border border-gray-300 px-5 py-3 text-lg text-gray-700 disabled:opacity-40 hover:bg-white">Previous</button>
-                  <button onClick={() => speakCurrent()} className="w-full sm:w-auto rounded-md bg-white/90 border border-gray-300 px-5 py-3 text-lg text-gray-700 hover:bg-white">Read aloud</button>
+                  
+                  {/* Voice recognition controls */}
+                  {speechSupported && (
+                    <div className="w-full">
+                      {!isListening ? (
+                        <button 
+                          onClick={startListening}
+                          className="flex items-center justify-center gap-2 rounded-md bg-purple-500 hover:bg-purple-600 text-white px-5 py-3 text-lg transition-colors w-full sm:w-auto"
+                        >
+                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/>
+                          </svg>
+                          Listen
+                        </button>
+                      ) : (
+                        <button 
+                          onClick={stopListening}
+                          className="flex items-center justify-center gap-2 rounded-md bg-red-500 hover:bg-red-600 text-white px-5 py-3 text-lg transition-colors animate-pulse w-full sm:w-auto"
+                        >
+                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z"/>
+                          </svg>
+                          Stop Listening
+                        </button>
+                      )}
+                      
+                      {recognizedText && (
+                        <div className="mt-2 p-2 bg-white/90 rounded-lg border border-purple-200">
+                          <p className="text-sm text-purple-800">
+                            <strong>Heard:</strong> {recognizedText}
+                          </p>
+                        </div>
+                      )}
+                      
+                      {voiceError && (
+                        <div className="mt-2 p-2 bg-white/90 rounded-lg border border-red-200">
+                          <p className="text-sm text-red-800">{voiceError}</p>
+                        </div>
+                      )}
+                      
+                      <div className="mt-2 p-2 bg-white/90 rounded-lg border border-blue-200">
+                        <p className="text-sm text-blue-800 font-medium mb-1">
+                          🎤 Voice Commands:
+                        </p>
+                        <p className="text-xs text-blue-600">
+                          Listening starts automatically after reading! Say: "Lion", "Monkey", "Penguin", "Hippo", "Let's go", or "Goodnight"
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Play/Pause/Stop audio controls */}
+                  <div className="flex gap-2">
+                    {!reading && !isPaused && (
+                      <button 
+                        onClick={speakCurrent} 
+                        className="flex items-center gap-2 rounded-md bg-green-500 hover:bg-green-600 text-white px-5 py-3 text-lg transition-colors"
+                      >
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M8 5v14l11-7z"/>
+                        </svg>
+                        Play
+                      </button>
+                    )}
+                    
+                    {reading && (
+                      <button 
+                        onClick={pauseReading} 
+                        className="flex items-center gap-2 rounded-md bg-yellow-500 hover:bg-yellow-600 text-white px-5 py-3 text-lg transition-colors"
+                      >
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+                        </svg>
+                        Pause
+                      </button>
+                    )}
+                    
+                    {isPaused && (
+                      <button 
+                        onClick={speakCurrent} 
+                        className="flex items-center gap-2 rounded-md bg-green-500 hover:bg-green-600 text-white px-5 py-3 text-lg transition-colors"
+                      >
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M8 5v14l11-7z"/>
+                        </svg>
+                        Resume
+                      </button>
+                    )}
+                    
+                    {(reading || isPaused) && (
+                      <button 
+                        onClick={stopReading} 
+                        className="flex items-center gap-2 rounded-md bg-red-500 hover:bg-red-600 text-white px-5 py-3 text-lg transition-colors"
+                      >
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M6 6h12v12H6z"/>
+                        </svg>
+                        Stop
+                      </button>
+                    )}
+                  </div>
+                  
                   <button onClick={next} disabled={idx === scenes.length - 1} className="w-full sm:w-auto rounded-md bg-indigo-600 text-white px-5 py-3 text-lg disabled:opacity-40 hover:bg-indigo-500">Next</button>
                 </div>
               </div>
@@ -382,8 +636,108 @@ export default function StoryPage() {
                 </div>
                 <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                   <button onClick={prev} disabled={idx === 0} className="w-full sm:w-auto rounded-md border border-gray-300 px-5 py-3 text-lg text-gray-700 disabled:opacity-40 hover:bg-gray-100">Previous</button>
-                  <button onClick={() => speakCurrent()} className="w-full sm:w-auto rounded-md border border-gray-300 px-5 py-3 text-lg text-gray-700 hover:bg-gray-100">Read aloud</button>
-                  <button onClick={() => stopReading()} disabled={!reading} className="w-full sm:w-auto rounded-md border border-gray-300 px-5 py-3 text-lg text-gray-700 disabled:opacity-40 hover:bg-gray-100">Stop</button>
+                  
+                  {/* Voice recognition controls */}
+                  {speechSupported && (
+                    <div className="w-full">
+                      {!isListening ? (
+                        <button 
+                          onClick={startListening}
+                          className="flex items-center justify-center gap-2 rounded-md bg-purple-500 hover:bg-purple-600 text-white px-5 py-3 text-lg transition-colors w-full sm:w-auto"
+                        >
+                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/>
+                          </svg>
+                          Listen
+                        </button>
+                      ) : (
+                        <button 
+                          onClick={stopListening}
+                          className="flex items-center justify-center gap-2 rounded-md bg-red-500 hover:bg-red-600 text-white px-5 py-3 text-lg transition-colors animate-pulse w-full sm:w-auto"
+                        >
+                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z"/>
+                          </svg>
+                          Stop Listening
+                        </button>
+                      )}
+                      
+                      {recognizedText && (
+                        <div className="mt-2 p-2 bg-purple-50 rounded-lg border border-purple-200">
+                          <p className="text-sm text-purple-800">
+                            <strong>Heard:</strong> {recognizedText}
+                          </p>
+                        </div>
+                      )}
+                      
+                      {voiceError && (
+                        <div className="mt-2 p-2 bg-red-50 rounded-lg border border-red-200">
+                          <p className="text-sm text-red-800">{voiceError}</p>
+                        </div>
+                      )}
+                      
+                      <div className="mt-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
+                        <p className="text-sm text-blue-800 font-medium mb-1">
+                          🎤 Voice Commands:
+                        </p>
+                        <p className="text-xs text-blue-600">
+                          Listening starts automatically after reading! Say: "Lion", "Monkey", "Penguin", "Hippo", "Let's go", or "Goodnight"
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Play/Pause/Stop audio controls */}
+                  <div className="flex gap-2">
+                    {!reading && !isPaused && (
+                      <button 
+                        onClick={speakCurrent} 
+                        className="flex items-center gap-2 rounded-md bg-green-500 hover:bg-green-600 text-white px-5 py-3 text-lg transition-colors"
+                      >
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M8 5v14l11-7z"/>
+                        </svg>
+                        Play
+                      </button>
+                    )}
+                    
+                    {reading && (
+                      <button 
+                        onClick={pauseReading} 
+                        className="flex items-center gap-2 rounded-md bg-yellow-500 hover:bg-yellow-600 text-white px-5 py-3 text-lg transition-colors"
+                      >
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+                        </svg>
+                        Pause
+                      </button>
+                    )}
+                    
+                    {isPaused && (
+                      <button 
+                        onClick={speakCurrent} 
+                        className="flex items-center gap-2 rounded-md bg-green-500 hover:bg-green-600 text-white px-5 py-3 text-lg transition-colors"
+                      >
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M8 5v14l11-7z"/>
+                        </svg>
+                        Resume
+                      </button>
+                    )}
+                    
+                    {(reading || isPaused) && (
+                      <button 
+                        onClick={stopReading} 
+                        className="flex items-center gap-2 rounded-md bg-red-500 hover:bg-red-600 text-white px-5 py-3 text-lg transition-colors"
+                      >
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M6 6h12v12H6z"/>
+                        </svg>
+                        Stop
+                      </button>
+                    )}
+                  </div>
+                  
                   <button onClick={next} disabled={idx === scenes.length - 1} className="w-full sm:w-auto rounded-md bg-indigo-600 text-white px-5 py-3 text-lg disabled:opacity-40 hover:bg-indigo-500">Next</button>
                 </div>
               </div>
