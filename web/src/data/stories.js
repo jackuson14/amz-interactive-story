@@ -73,5 +73,56 @@ export const SAMPLE_STORIES = [
       }
     ],
   },
+  {
+    id: "goodnight-zoo",
+    title: "Goodnight Zoo",
+    blurb: "Say goodnight to all the animals at the zoo",
+    isMarkdown: true,
+    markdownPath: "/stories/zoo/Goodnight%20Zoo",
+    scenes: [
+      { 
+        id: "page1", 
+        title: "Welcome to the Zoo", 
+        text: "It's nighttime at the zoo, and all the animals are getting ready for bed. But first, let's say goodnight to each of them! Are you ready for a magical journey through the zoo?", 
+        bg: "from-blue-100 via-purple-100 to-indigo-100",
+        image: "/stories/zoo/page1.png"
+      },
+      { 
+        id: "page2", 
+        title: "The African Savanna", 
+        text: "Listen! Do you hear that gentle roar? The lions are yawning. They're almost ready for bed!", 
+        bg: "from-orange-100 via-yellow-100 to-amber-100",
+        image: "/stories/zoo/page2.png"
+      },
+      { 
+        id: "page3", 
+        title: "The Tropical Jungle", 
+        text: "Swing into the jungle section! The monkeys are chattering softly", 
+        bg: "from-green-100 via-emerald-100 to-teal-100",
+        image: "/stories/zoo/page3.png"
+      },
+      { 
+        id: "page4", 
+        title: "The Arctic Adventure", 
+        text: "Brrr! It's chilly in the arctic area. The penguins are huddling together", 
+        bg: "from-cyan-100 via-blue-100 to-sky-100",
+        image: "/stories/zoo/page4.png"
+      },
+      { 
+        id: "page5", 
+        title: "The Final Round", 
+        text: "Almost done! The last few animals are waiting. Can you spot the yawning hippo? They're counting on you!", 
+        bg: "from-pink-100 via-rose-100 to-red-100",
+        image: "/stories/zoo/page5.png"
+      },
+      { 
+        id: "page6", 
+        title: "Sweet Dreams, Zoo", 
+        text: "Wonderful! All the animals are now fast asleep, dreaming sweet dreams. The zoo is peaceful and quiet. It's time for you to go home and have your own cozy sleep. Goodnight, little adventurer!", 
+        bg: "from-purple-100 via-violet-100 to-indigo-100",
+        image: "/stories/zoo/page6.png"
+      }
+    ],
+  },
 ];
 

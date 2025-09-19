@@ -40,6 +40,15 @@ export const PRESET_STORIES_BY_AGE = {
       description: "Step into a magical meadow where butterflies of every color flutter around you. Learn their special dance moves and twirl together among the flowers. The butterflies will teach you about friendship and show you their favorite flower snacks.",
       thumbnail: "🦋",
       color: "from-emerald-100 to-teal-100"
+    },
+    {
+      id: "goodnight-zoo-4",
+      title: "Goodnight Zoo",
+      oneLiner: "Say goodnight to all the animals at the zoo",
+      description: "Take a magical nighttime journey through the zoo and help all the animals get ready for bed. Visit the lions, monkeys, penguins, and hippos as you say goodnight to each one in this gentle bedtime adventure.",
+      thumbnail: "🦁",
+      color: "from-blue-100 to-purple-100",
+      storyId: "goodnight-zoo"
     }
   ],
   5: [
@@ -81,6 +90,15 @@ export const PRESET_STORIES_BY_AGE = {
       thumbnail: "😊",
       color: "from-rose-100 to-pink-100",
       storyId: "lily-lost-smile"
+    },
+    {
+      id: "goodnight-zoo-5",
+      title: "Goodnight Zoo",
+      oneLiner: "Say goodnight to all the animals at the zoo",
+      description: "Take a magical nighttime journey through the zoo and help all the animals get ready for bed. Visit the lions, monkeys, penguins, and hippos as you say goodnight to each one in this gentle bedtime adventure.",
+      thumbnail: "🦁",
+      color: "from-blue-100 to-purple-100",
+      storyId: "goodnight-zoo"
     }
   ],
   6: [
@@ -112,6 +130,15 @@ export const PRESET_STORIES_BY_AGE = {
       oneLiner: "Soar above the clouds on a magical flying carpet adventure",
       thumbnail: "🧞‍♂️",
       color: "from-indigo-100 to-purple-100"
+    },
+    {
+      id: "goodnight-zoo-6",
+      title: "Goodnight Zoo",
+      oneLiner: "Say goodnight to all the animals at the zoo",
+      description: "Take a magical nighttime journey through the zoo and help all the animals get ready for bed. Visit the lions, monkeys, penguins, and hippos as you say goodnight to each one in this gentle bedtime adventure.",
+      thumbnail: "🦁",
+      color: "from-blue-100 to-purple-100",
+      storyId: "goodnight-zoo"
     }
   ],
   7: [
@@ -142,6 +169,15 @@ export const PRESET_STORIES_BY_AGE = {
       oneLiner: "Create amazing inventions in a magical workshop full of gadgets",
       thumbnail: "⚙️",
       color: "from-amber-100 to-yellow-100"
+    },
+    {
+      id: "goodnight-zoo-7",
+      title: "Goodnight Zoo",
+      oneLiner: "Say goodnight to all the animals at the zoo",
+      description: "Take a magical nighttime journey through the zoo and help all the animals get ready for bed. Visit the lions, monkeys, penguins, and hippos as you say goodnight to each one in this gentle bedtime adventure.",
+      thumbnail: "🦁",
+      color: "from-blue-100 to-purple-100",
+      storyId: "goodnight-zoo"
     }
   ],
   8: [
@@ -173,6 +209,15 @@ export const PRESET_STORIES_BY_AGE = {
       oneLiner: "Study amazing sea creatures and protect the ocean ecosystem",
       thumbnail: "🐠",
       color: "from-teal-100 to-cyan-100"
+    },
+    {
+      id: "goodnight-zoo-8",
+      title: "Goodnight Zoo",
+      oneLiner: "Say goodnight to all the animals at the zoo",
+      description: "Take a magical nighttime journey through the zoo and help all the animals get ready for bed. Visit the lions, monkeys, penguins, and hippos as you say goodnight to each one in this gentle bedtime adventure.",
+      thumbnail: "🦁",
+      color: "from-blue-100 to-purple-100",
+      storyId: "goodnight-zoo"
     }
   ]
 };
