@@ -7,10 +7,12 @@ import Link from "next/link";
 import Image from "next/image";
 import { SAMPLE_STORIES } from "@/data/stories";
 import { parseMarkdownStory } from "@/utils/markdownParser";
+import AIStoryGenerator from "@/components/AIStoryGenerator";
 
 
 const SELFIE_KEY = "selfie_v1";
 const CHARACTER_KEY = "character_v1";
+const STORY_PROMPT_KEY = "story_prompt_v1";
 
 export default function StoryPage() {
   const router = useRouter();
@@ -29,6 +31,8 @@ export default function StoryPage() {
 
   const [messages, setMessages] = useState([]); // {role:'user'|'assistant', text:string}
   const [prompt, setPrompt] = useState("");
+  const [aiGeneratedMeta, setAiGeneratedMeta] = useState(null);
+
 
   const autoGenDone = useRef(false);
 
@@ -101,7 +105,7 @@ export default function StoryPage() {
       const qs = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
       const id = qs ? qs.get('story') : null;
       const prompt = qs ? qs.get('prompt') : null;
-      
+
       if (id) {
         setStoryId(id);
       } else if (prompt && prompt.includes("Lily's Lost Smile")) {
@@ -147,7 +151,7 @@ export default function StoryPage() {
     [storyId, markdownStory]
   );
   const scenes = customScenes ?? baseScenes;
-  
+
   // Show loading state if we're waiting for markdown content
   const isLoadingMarkdown = storyId && SAMPLE_STORIES.find(s => s.id === storyId)?.isMarkdown && !markdownStory;
 
@@ -159,7 +163,7 @@ export default function StoryPage() {
         if (parsed?.url) setSelfie(parsed);
       }
     } catch {}
-    
+
     try {
       const characterRaw = localStorage.getItem(CHARACTER_KEY);
       if (characterRaw) {
@@ -175,10 +179,10 @@ export default function StoryPage() {
     const loadMarkdownStory = async () => {
       console.log('loadMarkdownStory called with storyId:', storyId);
       if (!storyId) return;
-      
+
       const story = SAMPLE_STORIES.find((s) => s.id === storyId);
       console.log('Found story:', story);
-      
+
       if (story?.isMarkdown && story.markdownPath) {
         console.log('Loading markdown from:', story.markdownPath);
         try {
@@ -238,25 +242,25 @@ export default function StoryPage() {
     try {
       const qs = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
       let p = qs ? qs.get('prompt') : null;
-      
+
       // Skip auto-generation if we're loading a specific predefined story
       if (p && p.includes("Lily's Lost Smile")) {
         autoGenDone.current = true;
         return;
       }
-      
+
       // Skip auto-generation if we have a predefined story loaded via storyId
       if (storyId && storyId !== null) {
         autoGenDone.current = true;
         return;
       }
-      
+
       // Skip auto-generation if we have a story query parameter (means loading predefined story)
       if (qs && qs.get('story')) {
         autoGenDone.current = true;
         return;
       }
-      
+
       if (!p && typeof window !== 'undefined') {
         try { p = localStorage.getItem('story_prompt_v1') || null; } catch {}
       }
@@ -327,14 +331,35 @@ export default function StoryPage() {
   }, [router]);
 
 
+
   return (
     <main className="min-h-screen bg-white">
+      {aiError && (
+        <section className="px-6 sm:px-10 md:px-16 pt-4">
+          <div className="mx-auto max-w-5xl">
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+              {aiError}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Scene viewport */}
       {!current ? (
         // Loading state when current scene is not yet available
         <section className="px-6 sm:px-10 md:px-16 py-8">
-          <div className="flex items-center justify-center py-20">
-            <div className="text-gray-600">Loading...</div>
+          <div className="mx-auto max-w-5xl">
+            {/* Loading skeletons while generating AI story */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-pulse">
+              <div className="h-[260px] md:h-[360px] rounded-xl bg-gray-200" />
+              <div className="space-y-4">
+                <div className="h-8 w-2/3 bg-gray-200 rounded" />
+                <div className="h-4 w-full bg-gray-200 rounded" />
+                <div className="h-4 w-11/12 bg-gray-200 rounded" />
+                <div className="h-4 w-10/12 bg-gray-200 rounded" />
+                <div className="h-10 w-1/2 bg-gray-200 rounded mt-6" />
+              </div>
+            </div>
           </div>
         </section>
       ) : current.bg && current.bg.startsWith('/') ? (
@@ -348,19 +373,19 @@ export default function StoryPage() {
             className="object-cover"
             unoptimized
           />
-          
+
           {/* Content overlay - right side */}
           <div className="relative z-10 h-full flex">
             {/* Left side - empty for background image */}
             <div className="w-1/2"></div>
-            
+
             {/* Right side - text content */}
             <div className="w-1/2 flex flex-col justify-center p-8">
               {/* Story content */}
               <div className="text-white drop-shadow-lg">
                 <h2 className="text-3xl md:text-4xl font-extrabold mb-6 drop-shadow-lg">{current.title}</h2>
                 <p className="text-xl md:text-2xl leading-relaxed mb-8 drop-shadow-lg">{current.text}</p>
-                
+
                 {/* Navigation buttons */}
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                   <Link href="/play" className="w-full sm:w-auto rounded-md bg-white/90 border border-gray-300 px-5 py-3 text-lg text-gray-700 hover:bg-white text-center">Back</Link>
@@ -373,7 +398,7 @@ export default function StoryPage() {
           </div>
         </section>
       ) : (
-        // Original layout for non-background-image stories  
+        // Original layout for non-background-image stories
         <>
           <section className="px-6 sm:px-10 md:px-16 py-6 border-b bg-gradient-to-b from-white to-gray-50 flex items-center justify-between">
             <div>
@@ -382,7 +407,7 @@ export default function StoryPage() {
             </div>
             <div className="flex gap-2">
               <Link href="/play" className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100">Back</Link>
-              <button onClick={randomizeStory} className="rounded-md bg-indigo-600 text-white px-3 py-2 text-sm hover:bg-indigo-500">New story</button>
+              <button href="/play" className="rounded-md bg-indigo-600 text-white px-3 py-2 text-sm hover:bg-indigo-500">New story</button>
             </div>
           </section>
           <section className="px-6 sm:px-10 md:px-16 py-8">
@@ -403,23 +428,23 @@ export default function StoryPage() {
                 {current.image ? (
                   // Story has an image - show it as the main visual
                   <div className="relative h-full">
-                    <Image 
-                      src={current.image} 
-                      alt={current.title} 
+                    <Image
+                      src={current.image}
+                      alt={current.title}
                       fill
                       className="object-cover rounded-xl"
-                      unoptimized 
+                      unoptimized
                     />
                     {/* Optional overlay for user selfie in corner */}
                     {selfie && (
                       <div className="absolute bottom-4 right-4">
-                        <Image 
-                          src={selfie.url} 
-                          alt="you" 
-                          width={80} 
-                          height={80} 
-                          className="w-16 h-16 sm:w-20 sm:h-20 rounded-full shadow-lg ring-2 ring-white/80" 
-                          unoptimized 
+                        <Image
+                          src={selfie.url}
+                          alt="you"
+                          width={80}
+                          height={80}
+                          className="w-16 h-16 sm:w-20 sm:h-20 rounded-full shadow-lg ring-2 ring-white/80"
+                          unoptimized
                         />
                       </div>
                     )}

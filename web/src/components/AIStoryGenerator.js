@@ -4,8 +4,9 @@ import { useMutation } from '@tanstack/react-query';
 import { useCallback } from 'react';
 
 const SELFIE_KEY = "selfie_v1";
+const CHARACTER_KEY = "character_v1";
 
-const generateStoryAPI = async ({ prompt, systemPrompt, selfie }) => {
+const generateStoryAPI = async ({ prompt, systemPrompt, selfie, character }) => {
   const response = await fetch('/api/generate-story', {
     method: 'POST',
     headers: {
@@ -14,7 +15,8 @@ const generateStoryAPI = async ({ prompt, systemPrompt, selfie }) => {
     body: JSON.stringify({
       selfie,
       systemPrompt,
-      story: prompt
+      story: prompt,
+      character,
     })
   });
 
@@ -115,38 +117,65 @@ const AIStoryGenerator = ({ onStoryGenerated }) => {
       console.warn('Could not load selfie from localStorage:', e);
     }
 
-    // Default system prompt for children's stories
-    const systemPrompt = selfie
-      ? `You are a creative children's story illustrator and writer. Create a gentle, age-appropriate story with beautiful illustrations that incorporate the person in the provided selfie as the main character.
+    // Load personalization (name, age, gender) from localStorage
+    let character = { name: null, age: null, gender: null };
+    try {
+      const rawChar = localStorage.getItem(CHARACTER_KEY);
+      if (rawChar) {
+        const parsedChar = JSON.parse(rawChar);
+        character = {
+          name: parsedChar?.name || null,
+          age: parsedChar?.age || null,
+          gender: parsedChar?.gender || null,
+        };
+      }
+    } catch (e) {
+      console.warn('Could not load character from localStorage:', e);
+    }
 
-Requirements:
-- The story should be engaging, positive, and suitable for children aged 4-8
-- Create exactly 3 scenes/chapters
-- Each scene should have a title and descriptive text
-- Include the main character (from the selfie) in each scene
-- Make it an adventure that teaches positive values like friendship, courage, or kindness
-- Keep the language simple and age-appropriate
+    // Compose system prompt for Google LLM (Gemini) with personalization
+    const childName = character.name || 'the child';
+    const childAge = character.age || '4-8';
+    const childGender = character.gender || 'child';
 
-Story prompt: ${prompt}
+    const systemPrompt = `You are a sophisticated AI Personalized Storyboard Director. Your function is to take a user-provided reference image (including a photograph or selfie), transform it into a consistent storybook character, and generate a sequence of illustrations featuring that character within the scenes of an accompanying story.
 
-Please format your response as a story with clear scene breaks.`
-      : `You are a creative children's story illustrator and writer. Create a gentle, age-appropriate story with beautiful illustrations.
+Primary Directive: Character Integrity and Consistency
+Your absolute highest priority is to flawlessly maintain the likeness and style of the main character across all generated images.
 
-Requirements:
-- The story should be engaging, positive, and suitable for children aged 4-8
-- Create exactly 3 scenes/chapters
-- Each scene should have a title and descriptive text
-- Make it an adventure that teaches positive values like friendship, courage, or kindness
-- Keep the language simple and age-appropriate
+Capture Likeness: Capture key recognizable features from the reference image (hair color/style, eye color, distinct facial characteristics).
+Maintain the Stylized Form: Once you establish the illustrated version of the character, use that specific stylized form consistently in every scene.
+Adapt to the Scene: Vary expression, pose, and actions to fit the narrative, but the core appearance must remain identical.
 
-Story prompt: ${prompt}
+Personalization:
+- The main character is named ${childName}, a ${childAge} year old ${childGender}.
+- Ensure the story tone and visuals are suitable and delightful for a ${childAge} year old.
 
-Please format your response as a story with clear scene breaks.`;
+Core Task: Photo-to-Character Transformation
+If a photograph/selfie is provided, first analyze it and creatively transform the person into a charming, expressive illustrated character. Avoid photorealism; adopt a clean, modern digital storybook style unless the story specifies otherwise.
+
+Instructions:
+1) Analyze and Stylize Reference Image (if provided) to establish the official artistic look.
+2) Read the user’s story idea below to understand plot, settings, and actions.
+3) Identify exactly 3 of the most visually compelling and narratively significant scenes.
+4) For each of the 3 scenes, generate a high-quality, family-friendly illustration featuring the established character placed within the scene.
+5) Also write clear, age-appropriate narrative text for each scene (a short paragraph) that matches the illustration.
+
+Strict Prohibitions:
+- Do not alter the established stylized appearance of the character once created.
+- All generated images must be 100% safe-for-work (SFW).
+
+Story idea: ${prompt}
+
+Output format guidance:
+- Provide narrative text naturally as part of the response and include images as inline data in the multimodal output. The application will parse both text and images.
+`;
 
     return mutation.mutateAsync({
       prompt,
       systemPrompt,
-      selfie
+      selfie,
+      character,
     });
   }, [mutation]);
 

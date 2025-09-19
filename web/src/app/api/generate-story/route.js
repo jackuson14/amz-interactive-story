@@ -2,21 +2,11 @@ import { GoogleGenAI } from '@google/genai';
 import mime from 'mime';
 import { NextResponse } from 'next/server';
 
-// Helper function to save binary file (adapted for web environment)
-function saveBinaryFile(fileName, content) {
-  // In a web environment, we'll return the file data instead of saving to filesystem
-  return {
-    fileName,
-    content,
-    size: content.length
-  };
-}
-
 export async function POST(request) {
   try {
     // Parse the request body
     const body = await request.json();
-    const { selfie, systemPrompt, story } = body;
+    const { selfie, systemPrompt, story, character } = body;
 
     // Validate required fields
     if (!systemPrompt || !story) {
@@ -55,10 +45,15 @@ export async function POST(request) {
 
     const model = 'gemini-2.5-flash-image-preview';
 
-    // Prepare the input text combining system prompt and story
+    // Prepare personalization from character if provided
+    const personalizationText = character && (character.name || character.age || character.gender)
+      ? `\n\nPersonalization:\n- Child name: ${character.name || ''}\n- Age: ${character.age || ''}\n- Gender: ${character.gender || ''}`
+      : '';
+
+    // Prepare the input text combining system prompt, personalization and story
     const inputText = selfie
-      ? `${systemPrompt}\n\nStory: ${story}\n\nPlease create an illustrated story based on the provided selfie and story content.`
-      : `${systemPrompt}\n\nStory: ${story}\n\nPlease create an illustrated story based on the story content.`;
+      ? `${systemPrompt}${personalizationText}\n\nStory: ${story}\n\nPlease create an illustrated story based on the provided selfie and story content.`
+      : `${systemPrompt}${personalizationText}\n\nStory: ${story}\n\nPlease create an illustrated story based on the story content.`;
 
     // Prepare the content parts
     const parts = [
@@ -111,14 +106,16 @@ export async function POST(request) {
         const fileName = `story_image_${fileIndex++}`;
         const inlineData = chunk.candidates[0].content.parts[0].inlineData;
         const fileExtension = mime.getExtension(inlineData.mimeType || '');
-        const buffer = Buffer.from(inlineData.data || '', 'base64');
-        
-        const savedFile = saveBinaryFile(`${fileName}.${fileExtension}`, buffer);
+
+        // Estimate size from base64 length to avoid using Buffer in edge runtimes
+        const base64Len = (inlineData.data || '').length;
+        const estimatedSize = Math.floor(base64Len * 0.75); // rough bytes estimate
+
         results.images.push({
-          fileName: savedFile.fileName,
+          fileName: `${fileName}.${fileExtension}`,
           mimeType: inlineData.mimeType,
           data: inlineData.data, // Base64 encoded data
-          size: savedFile.size
+          size: estimatedSize
         });
       }
       // Handle text content
