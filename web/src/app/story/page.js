@@ -270,10 +270,23 @@ export default function StoryPage() {
             unoptimized
           />
           
-          {/* Content overlay - right side */}
+          {/* Content overlay */}
           <div className="relative z-10 h-full flex">
-            {/* Left side - empty for background image */}
-            <div className="w-1/2"></div>
+            {/* Left side - character */}
+            <div className="w-1/2 flex items-center justify-center p-8">
+              {storyId === "goodnight-zoo" && (
+                <div className="flex items-end justify-center h-full pb-16">
+                  <Image
+                    src={`/stories/zoo/char/boy${Math.min(idx + 1, 2)}.png`}
+                    alt="Main character"
+                    width={300}
+                    height={400}
+                    className="drop-shadow-2xl"
+                    unoptimized
+                  />
+                </div>
+              )}
+            </div>
             
             {/* Right side - text content */}
             <div className="w-1/2 flex flex-col justify-center p-8">
