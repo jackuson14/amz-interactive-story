@@ -487,7 +487,7 @@ export default function PlayAppearancePage() {
                     📸 Generate your character to continue!
                   </p>
                   <p className="text-yellow-600 text-sm mt-1">
-                    Click the "Generate Character" button above to create your cartoon version.
+                    Click the &quot;Generate Character&quot; button above to create your cartoon version.
                   </p>
                 </div>
               )}
