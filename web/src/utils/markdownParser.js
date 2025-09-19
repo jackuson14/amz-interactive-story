@@ -25,8 +25,11 @@ export function parseMarkdownStory(markdownContent, characterName = "Lily", char
   let blurb = '';
   let title = '';
   
-  // Extract title from first line
-  const titleMatch = lines[0].match(/^# (.+)$/);
+  // Detect if this is a zoo story
+  const isZooStory = markdownContent.includes('Goodnight Zoo') || markdownContent.includes('zoo');
+  
+  // Extract title from first line (either # or ##)
+  const titleMatch = lines[0].match(/^#{1,2} (.+)$/);
   if (titleMatch) {
     title = replacePronounsAndGender(titleMatch[1], characterName, characterGender);
   }
@@ -40,8 +43,8 @@ export function parseMarkdownStory(markdownContent, characterName = "Lily", char
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     
-    // Check for page headers
-    const pageMatch = line.match(/^## Page (\d+): (.+)$/);
+    // Check for page headers (both ## and ### formats)
+    const pageMatch = line.match(/^#{2,3} Page (\d+): (.+)$/);
     if (pageMatch) {
       // Save previous scene if exists
       if (currentScene) {
@@ -49,12 +52,13 @@ export function parseMarkdownStory(markdownContent, characterName = "Lily", char
       }
       
       // Start new scene
+      const pageNum = parseInt(pageMatch[1]);
       currentScene = {
-        id: `page${pageMatch[1]}`,
+        id: `page${pageNum}`,
         title: pageMatch[2],
         text: '',
-        image: '',
-        bg: getBackgroundForPage(parseInt(pageMatch[1]))
+        image: '', // Remove image for zoo stories to use background instead
+        bg: isZooStory ? getZooBackground(pageNum) : getBackgroundForPage(pageNum)
       };
       continue;
     }
@@ -73,6 +77,12 @@ export function parseMarkdownStory(markdownContent, characterName = "Lily", char
         // Create new path with proper encoding
         const folderName = encodeURIComponent("Lily's Lost Smile");
         imagePath = `/stories/${folderName}/${filename}`;
+      }
+      // Check if it's a zoo story image
+      else if (imagePath.includes("zoo") || imagePath.includes("page")) {
+        // For zoo story, ensure proper path
+        const filename = imagePath.split('/').pop();
+        imagePath = `/stories/zoo/${filename}`;
       }
       
       currentScene.image = imagePath;
@@ -115,4 +125,11 @@ function getBackgroundForPage(pageNumber) {
     "from-rose-100 via-pink-100 to-yellow-100"
   ];
   return backgrounds[(pageNumber - 1) % backgrounds.length];
+}
+
+function getZooBackground(pageNumber) {
+  // Return the URL for the zoo background image
+  // Handle inconsistent naming: page1.jpg vs Page2.jpg, etc.
+  const filename = pageNumber === 1 ? 'page1.jpg' : `Page${pageNumber}.jpg`;
+  return `/stories/zoo/bg/${filename}`;
 }
