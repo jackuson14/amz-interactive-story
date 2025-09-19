@@ -29,5 +29,100 @@ export const SAMPLE_STORIES = [
       { id: "choice", title: "Treasure Map", text: "Follow the map to the gift shop for a shiny badge.", bg: "from-indigo-100 via-sky-100 to-cyan-100" },
     ],
   },
+  {
+    id: "lily-lost-smile",
+    title: "The Lost Smile",
+    blurb: "Help yourself find your missing smile by spreading happiness to others",
+    isMarkdown: true,
+    markdownPath: "/stories/Lily's Lost Smile/Lily's Lost Smile.md",
+    scenes: [
+      { 
+        id: "page1", 
+        title: "The Missing Smile", 
+        text: "Lily had a bright, sparkly smile that could light up a whole room. But one morning, when she woke up, her smile was gone! She looked in the mirror and saw a very straight, serious mouth. \"Oh no!\" she whispered. Her favorite yellow dress didn't feel as sunny, and even her fluffy teddy bear didn't seem as cuddly without a smile to share with him. Lily decided she needed to find her smile, and she knew just where to start looking.", 
+        bg: "from-yellow-100 via-amber-100 to-orange-100",
+        image: "/stories/Lily%27s%20Lost%20Smile/1-Lily'sLostSmile.png"
+      },
+      { 
+        id: "page2", 
+        title: "Searching in the Garden", 
+        text: "First, Lily looked in the garden. \"Maybe my smile is hiding with the daisies!\" she thought. She gently peeked under a big, white flower. No smile. Then, she looked near the busy buzzing bumblebees. She giggled at their fuzzy little bottoms, but her smile didn't come back. A little ladybug crawled onto her finger, and Lily whispered, \"Have you seen my smile?\" The ladybug just wiggled its antennae and flew away.", 
+        bg: "from-green-100 via-emerald-100 to-teal-100",
+        image: "/stories/Lily%27s%20Lost%20Smile/2-Lily'sLostSmile.png"
+      },
+      { 
+        id: "page3", 
+        title: "At the Park", 
+        text: "Next, Lily went to the park. She saw her friend Leo playing with a bright red ball. Leo was making funny faces and laughing. Lily watched him, but her serious mouth didn't move. She felt a little sad and stayed on the edge of the playground. A little boy on the swings looked lonely. He was just sitting there, not swinging at all. He had tears in his eyes.", 
+        bg: "from-blue-100 via-sky-100 to-cyan-100",
+        image: "/stories/Lily%27s%20Lost%20Smile/3-Lily'sLostSmile.png"
+      },
+      { 
+        id: "page4", 
+        title: "Sharing Happiness", 
+        text: "Lily walked over to the boy. She didn't have her smile, but she had an idea. She sat on the swing next to him and started to sing her favorite silly song, the one about a duck with a polka-dot hat. She sang loudly and wiggled her toes. The little boy stopped crying and looked at her. He gave a tiny giggle. Lily kept singing, and soon the little boy was giggling even more.", 
+        bg: "from-purple-100 via-pink-100 to-rose-100",
+        image: "/stories/Lily%27s%20Lost%20Smile/4-Lily'sLostSmile.png"
+      },
+      { 
+        id: "page5", 
+        title: "The Smile Returns", 
+        text: "As the boy's giggle grew, something amazing happened. Lily felt a tiny tingle on her serious mouth. It started to turn up, just a little bit. Then, it turned up a little more. The little boy on the swing was smiling now, a big, happy smile. And when he smiled, Lily's own bright, sparkly smile popped right back! She had found it not by looking for it, but by sharing a little bit of happiness with someone else. She learned that a smile isn't something you can find—it's something you give away.", 
+        bg: "from-rose-100 via-pink-100 to-yellow-100",
+        image: "/stories/Lily%27s%20Lost%20Smile/5-Lily'sLostSmile.png"
+      }
+    ],
+  },
+  {
+    id: "goodnight-zoo",
+    title: "Goodnight Zoo",
+    blurb: "Say goodnight to all the animals at the zoo",
+    isMarkdown: true,
+    markdownPath: "/stories/zoo/Goodnight%20Zoo",
+    scenes: [
+      { 
+        id: "page1", 
+        title: "Welcome to the Zoo", 
+        text: "It's nighttime at the zoo, and all the animals are getting ready for bed. But first, let's say goodnight to each of them! Are you ready for a magical journey through the zoo?", 
+        bg: "from-blue-100 via-purple-100 to-indigo-100",
+        image: "/stories/zoo/page1.png"
+      },
+      { 
+        id: "page2", 
+        title: "The African Savanna", 
+        text: "Listen! Do you hear that gentle roar? The lions are yawning. They're almost ready for bed!", 
+        bg: "from-orange-100 via-yellow-100 to-amber-100",
+        image: "/stories/zoo/page2.png"
+      },
+      { 
+        id: "page3", 
+        title: "The Tropical Jungle", 
+        text: "Swing into the jungle section! The monkeys are chattering softly", 
+        bg: "from-green-100 via-emerald-100 to-teal-100",
+        image: "/stories/zoo/page3.png"
+      },
+      { 
+        id: "page4", 
+        title: "The Arctic Adventure", 
+        text: "Brrr! It's chilly in the arctic area. The penguins are huddling together", 
+        bg: "from-cyan-100 via-blue-100 to-sky-100",
+        image: "/stories/zoo/page4.png"
+      },
+      { 
+        id: "page5", 
+        title: "The Final Round", 
+        text: "Almost done! The last few animals are waiting. Can you spot the yawning hippo? They're counting on you!", 
+        bg: "from-pink-100 via-rose-100 to-red-100",
+        image: "/stories/zoo/page5.png"
+      },
+      { 
+        id: "page6", 
+        title: "Sweet Dreams, Zoo", 
+        text: "Wonderful! All the animals are now fast asleep, dreaming sweet dreams. The zoo is peaceful and quiet. It's time for you to go home and have your own cozy sleep. Goodnight, little adventurer!", 
+        bg: "from-purple-100 via-violet-100 to-indigo-100",
+        image: "/stories/zoo/page6.png"
+      }
+    ],
+  },
 ];
 

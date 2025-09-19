@@ -53,12 +53,40 @@ const PRESET_CHARACTERS = [
   }
 ];
 
+// Get available character images based on age and gender
+const getAvailableCharacterImages = (age, gender) => {
+  if (!gender || !age) return [];
+  
+  const genderPrefix = gender === "boy" ? "Male" : "Female";
+  
+  if (age === "3" || age === "4") {
+    // For 3-4yo: Female-Artboard 1,3,5 and Male-Artboard 2,4,6
+    const artboardNumbers = gender === "girl" ? [1, 3, 5] : [2, 4, 6];
+    return artboardNumbers.map(num => ({
+      id: `${genderPrefix}-${num}`,
+      path: `/images/3-4yo/${genderPrefix}-Artboard ${num}.jpg`,
+      name: `Character ${num}`
+    }));
+  } else if (age === "5" || age === "6") {
+    // For 5-6yo: Female-Artboard 8,10,12 and Male-Artboard 7,9,11  
+    const artboardNumbers = gender === "girl" ? [8, 10, 12] : [7, 9, 11];
+    return artboardNumbers.map(num => ({
+      id: `${genderPrefix}-${num}`,
+      path: `/images/5-6yo/${genderPrefix}-Artboard ${num}.jpg`,
+      name: `Character ${num}`
+    }));
+  }
+  
+  return [];
+};
+
 export default function PlayAppearancePage() {
   const router = useRouter();
   
   // Character info state
   const [characterName, setCharacterName] = useState("");
   const [characterAge, setCharacterAge] = useState("");
+  const [characterGender, setCharacterGender] = useState("");
   
   // Character type selection
   const [characterType, setCharacterType] = useState("selfie"); // "selfie" or "preset"
@@ -84,13 +112,15 @@ export default function PlayAppearancePage() {
         
         const name = characterData.name || "";
         const age = characterData.age || "";
+        const gender = characterData.gender || "";
         
         setCharacterName(name);
         setCharacterAge(age);
+        setCharacterGender(gender);
         setCharacterType(characterData.type || "selfie");
         setSelectedPresetCharacter(characterData.presetCharacter || null);
         
-        console.log("Loaded character data:", { name, age });
+        console.log("Loaded character data:", { name, age, gender });
         
         // TEMPORARILY DISABLE REDIRECT - let's see what's happening
         // if (!name.trim() || !age) {
@@ -176,46 +206,47 @@ export default function PlayAppearancePage() {
     };
   }, []);
 
-  // Save character data whenever appearance choices change (preserve existing name/age)
+  // Save character data whenever appearance choices change (preserve existing name/age/gender)
   useEffect(() => {
     try {
       // Get existing data
       const existingRaw = localStorage.getItem(CHARACTER_KEY);
       const existingData = existingRaw ? JSON.parse(existingRaw) : {};
       
-      // Merge with new appearance data, preserving name and age
+      // Merge with new appearance data, preserving name, age, and gender
       const characterData = { 
         name: existingData.name || characterName, 
         age: existingData.age || characterAge,
+        gender: existingData.gender || characterGender, // Preserve gender!
         type: characterType,
         presetCharacter: selectedPresetCharacter
       };
       localStorage.setItem(CHARACTER_KEY, JSON.stringify(characterData));
     } catch {}
-  }, [characterType, selectedPresetCharacter, characterName, characterAge]);
+  }, [characterType, selectedPresetCharacter, characterName, characterAge, characterGender]);
 
   const canProceed = (characterType === "selfie" && selfie) || (characterType === "preset" && selectedPresetCharacter);
 
   return (
-    <main className="min-h-screen bg-white">
-      <section className="px-6 sm:px-10 md:px-16 py-10 border-b bg-gradient-to-b from-white to-gray-50">
-        <h1 className="text-3xl sm:text-4xl font-bold">Play</h1>
-        <p className="mt-2 text-gray-600">Step 2 of 3: Create your character appearance, {characterName}!</p>
-        <div className="mt-6 flex flex-col sm:flex-row flex-wrap gap-3">
-          <Link href="/play/character" className="w-full sm:w-auto text-center rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Back to Step 1</Link>
+    <main className="min-h-screen bg-gradient-to-br from-orange-50 via-yellow-50 to-green-50">
+      <section className="px-6 sm:px-10 md:px-16 py-10 border-b bg-gradient-to-r from-orange-400 to-yellow-400">
+        <h1 className="text-4xl font-bold text-white mb-2">Create Your Look!</h1>
+        <p className="text-orange-100 text-lg">Step 2 of 3: Create your character appearance, {characterName}!</p>
+        <div className="mt-6">
+          <Link href="/play/character" className="bg-white/20 hover:bg-white/30 text-white px-6 py-3 rounded-full font-medium transition-colors backdrop-blur-sm border border-white/20">← Back to Step 1</Link>
         </div>
       </section>
 
       <section className="px-6 sm:px-10 md:px-16 py-8">
-        <div className="mx-auto max-w-4xl">
-          <div className="rounded-xl border bg-white p-6 sm:p-8">
-            <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-gray-500 mb-6">
-              <span className="inline-block w-6 h-6 rounded-full bg-indigo-600 text-white grid place-items-center">2</span> 
-              Character Appearance
+        <div className="mx-auto max-w-6xl">
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-white/50 shadow-xl p-6 sm:p-8">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-r from-orange-500 to-yellow-500 text-white grid place-items-center font-bold text-lg">2</div>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Your Appearance</h2>
+                <p className="text-gray-600">How do you want to appear in your story?</p>
+              </div>
             </div>
-            
-            <h2 className="text-2xl font-bold mb-2 text-gray-900">How do you want to appear in your story?</h2>
-            <p className="text-gray-800 mb-6">Choose to use your own photo or pick from our preset characters.</p>
 
             {/* Character Type Selection */}
             <div className="mb-8">
@@ -255,8 +286,10 @@ export default function PlayAppearancePage() {
 
             {/* Selfie Interface */}
             {characterType === "selfie" && (
-              <div>
-                <h3 className="text-lg font-semibold mb-4 text-gray-900">Take Your Photo</h3>
+              <div className="bg-gradient-to-br from-orange-50 to-yellow-50 rounded-2xl p-6 border border-orange-200">
+                <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+                  <span className="text-orange-500">📷</span> Camera
+                </h3>
                 
                 {cameraError && (
                   <div className="mb-4 rounded border border-red-200 bg-red-50 text-red-700 p-3 text-sm">{cameraError}</div>
@@ -265,15 +298,15 @@ export default function PlayAppearancePage() {
                 <div className="flex flex-wrap items-start gap-6">
                   <div className="flex flex-col gap-3">
                     {!cameraOn ? (
-                      <button onClick={startCamera} className="rounded-md bg-black text-white px-6 py-3 text-sm font-medium hover:opacity-90">
-                        Start Camera
+                      <button onClick={startCamera} className="bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-600 hover:to-yellow-600 text-white px-8 py-4 rounded-full font-bold text-lg transition-all transform hover:scale-105 shadow-lg">
+                        🎬 Start Camera
                       </button>
                     ) : (
-                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                        <button onClick={captureFrame} className="rounded-md bg-black text-white px-6 py-3 text-sm font-medium hover:opacity-90">
-                          Capture Photo
+                      <div className="flex flex-col gap-4">
+                        <button onClick={captureFrame} className="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white px-8 py-4 rounded-full font-bold transition-all transform hover:scale-105 shadow-lg">
+                          📸 Capture Photo
                         </button>
-                        <button onClick={stopCamera} className="rounded-md border border-gray-300 px-6 py-3 text-sm font-medium text-gray-700 hover:bg-gray-100">
+                        <button onClick={stopCamera} className="border-2 border-orange-300 text-orange-600 hover:bg-orange-50 px-6 py-3 rounded-full font-medium transition-colors">
                           Stop Camera
                         </button>
                       </div>
@@ -324,23 +357,30 @@ export default function PlayAppearancePage() {
 
             {/* Preset Character Interface */}
             {characterType === "preset" && (
-              <div>
-                <h3 className="text-lg font-semibold mb-4 text-gray-900">Choose Your Character</h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-                  {PRESET_CHARACTERS.map((character) => (
+              <div className="bg-gradient-to-br from-green-50 to-blue-50 rounded-2xl p-6 border border-green-200">
+                <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+                  <span className="text-green-500">🌟</span> Choose Your Character
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-8">
+                  {getAvailableCharacterImages(characterAge, characterGender).map((characterImg) => (
                     <div
-                      key={character.id}
-                      onClick={() => setSelectedPresetCharacter(character)}
-                      className={`p-4 rounded-lg border-2 cursor-pointer transition-all hover:shadow-md bg-gradient-to-br ${character.color} ${
-                        selectedPresetCharacter?.id === character.id
-                          ? "border-indigo-600 ring-2 ring-indigo-300"
-                          : "border-gray-300 hover:border-indigo-300"
+                      key={characterImg.id}
+                      onClick={() => setSelectedPresetCharacter(characterImg)}
+                      className={`aspect-square rounded-2xl border-3 cursor-pointer transition-all transform hover:scale-105 hover:shadow-xl bg-gradient-to-br from-blue-50 to-purple-50 ${
+                        selectedPresetCharacter?.id === characterImg.id
+                          ? "border-orange-500 ring-4 ring-orange-300 shadow-2xl scale-105"
+                          : "border-white/50 hover:border-orange-300"
                       }`}
                     >
-                      <div className="text-center">
-                        <div className="text-4xl mb-2">{character.emoji}</div>
-                        <h4 className="font-semibold text-gray-900 mb-1">{character.name}</h4>
-                        <p className="text-xs text-gray-700">{character.description}</p>
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Image
+                          src={characterImg.path}
+                          alt={characterImg.name}
+                          width={200}
+                          height={200}
+                          className="rounded-lg object-cover w-full h-full"
+                          unoptimized
+                        />
                       </div>
                     </div>
                   ))}
@@ -349,29 +389,30 @@ export default function PlayAppearancePage() {
                 {selectedPresetCharacter && (
                   <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
                     <p className="text-sm text-indigo-800">
-                      <strong>{selectedPresetCharacter.name}</strong> selected! {selectedPresetCharacter.emoji}
+                      <strong>{selectedPresetCharacter.name}</strong> selected! ✨
                     </p>
-                    <p className="text-xs text-indigo-600 mt-1">{selectedPresetCharacter.description}</p>
+                    <p className="text-xs text-indigo-600 mt-1">Perfect choice for your story adventure!</p>
                   </div>
                 )}
               </div>
             )}
 
             {/* Next Button */}
-            <div className="mt-8 pt-6 border-t border-gray-200">
+            <div className="mt-12 text-center">
               <Link
                 href="/play/idea"
-                className={`w-full text-center rounded-lg py-4 px-6 text-lg font-medium transition-colors block ${
-                  canProceed
-                    ? "bg-indigo-600 text-white hover:bg-indigo-500"
+                className={`inline-flex items-center gap-3 px-10 py-5 rounded-full font-bold text-lg transition-all transform hover:scale-105 shadow-lg ${
+                  canProceed 
+                    ? "bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white" 
                     : "bg-gray-300 text-gray-500 cursor-not-allowed"
                 }`}
                 aria-disabled={!canProceed}
                 onClick={(e) => { if (!canProceed) e.preventDefault(); }}
               >
-                Next: Choose Story
+                <span>Next: Choose Story</span>
+                <span className="text-2xl">🎯</span>
               </Link>
-              <p className="text-center text-sm text-gray-500 mt-2">Step 2 of 3</p>
+              <p className="text-sm text-gray-500 mt-3">Step 2 of 3</p>
             </div>
           </div>
         </div>

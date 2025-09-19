@@ -8,6 +8,7 @@ export default function PlayCharacterPage() {
   // Character info state
   const [characterName, setCharacterName] = useState("");
   const [characterAge, setCharacterAge] = useState("");
+  const [characterGender, setCharacterGender] = useState("");
 
   // Load existing data from storage
   useEffect(() => {
@@ -17,6 +18,7 @@ export default function PlayCharacterPage() {
         const characterData = JSON.parse(characterRaw);
         setCharacterName(characterData.name || "");
         setCharacterAge(characterData.age || "");
+        setCharacterGender(characterData.gender || "");
       }
     } catch {}
   }, []);
@@ -26,13 +28,14 @@ export default function PlayCharacterPage() {
     try {
       const characterData = { 
         name: characterName, 
-        age: characterAge
+        age: characterAge,
+        gender: characterGender
       };
       localStorage.setItem(CHARACTER_KEY, JSON.stringify(characterData));
     } catch {}
-  }, [characterName, characterAge]);
+  }, [characterName, characterAge, characterGender]);
 
-  const canProceed = characterName.trim() && characterAge;
+  const canProceed = characterName.trim() && characterAge && characterGender;
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-orange-50 via-yellow-50 to-blue-50">
@@ -92,25 +95,56 @@ export default function PlayCharacterPage() {
                     className="w-full rounded-xl border-2 border-blue-200 px-6 py-4 text-lg text-gray-900 focus:border-blue-400 focus:ring-2 focus:ring-blue-200 bg-white shadow-sm transition-all"
                   >
                     <option value="">Pick your age! 🎈</option>
-                    <option value="4">4 years old 🌱</option>
-                    <option value="5">5 years old 🌟</option>
-                    <option value="6">6 years old 🚀</option>
-                    <option value="7">7 years old ⭐</option>
-                    <option value="8">8 years old 🎯</option>
-                    <option value="9">9 years old 🏆</option>
-                    <option value="10">10 years old 👑</option>
+                    <option value="3">3 years old 🌱</option>
+                    <option value="4">4 years old 🌟</option>
+                    <option value="5">5 years old 🚀</option>
+                    <option value="6">6 years old ⭐</option>
                   </select>
                 </div>
               </div>
               
-              {characterName && characterAge && (
+              <div>
+                <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl p-6">
+                  <label htmlFor="character-gender" className="block text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                    👦👧 Are you a boy or a girl?
+                  </label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setCharacterGender("boy")}
+                      className={`w-full rounded-xl border-2 px-6 py-4 text-lg font-bold transition-all flex items-center justify-center gap-2 ${
+                        characterGender === "boy" 
+                          ? "border-blue-400 bg-blue-50 text-blue-700 ring-2 ring-blue-200" 
+                          : "border-purple-200 bg-white text-gray-700 hover:border-blue-300 hover:bg-blue-50"
+                      }`}
+                    >
+                      <span className="text-2xl">👦</span>
+                      Boy
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCharacterGender("girl")}
+                      className={`w-full rounded-xl border-2 px-6 py-4 text-lg font-bold transition-all flex items-center justify-center gap-2 ${
+                        characterGender === "girl" 
+                          ? "border-pink-400 bg-pink-50 text-pink-700 ring-2 ring-pink-200" 
+                          : "border-purple-200 bg-white text-gray-700 hover:border-pink-300 hover:bg-pink-50"
+                      }`}
+                    >
+                      <span className="text-2xl">👧</span>
+                      Girl
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
+              {characterName && characterAge && characterGender && (
                 <div className="bg-gradient-to-br from-green-100 to-blue-100 border-2 border-green-200 rounded-2xl p-6 text-center transform hover:scale-105 transition-all duration-200">
                   <div className="text-4xl mb-3">🎉</div>
                   <p className="text-xl font-bold text-gray-900 mb-2">
                     Hi <span className="text-green-600">{characterName}</span>! 
                   </p>
                   <p className="text-lg text-gray-700 mb-3">
-                    You&apos;re {characterAge} years old and ready for adventure!
+                    You&apos;re a {characterAge} year old {characterGender} and ready for adventure!
                   </p>
                   <p className="text-sm text-green-700 bg-white rounded-full px-4 py-2 inline-block">
                     ✨ Next: Create your character appearance
@@ -135,7 +169,8 @@ export default function PlayCharacterPage() {
                       try {
                         const characterData = { 
                           name: characterName, 
-                          age: characterAge
+                          age: characterAge,
+                          gender: characterGender
                         };
                         localStorage.setItem(CHARACTER_KEY, JSON.stringify(characterData));
                       } catch {}
