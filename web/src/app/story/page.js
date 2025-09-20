@@ -51,9 +51,33 @@ export default function StoryPage() {
   // Jump detection state
   const [jumpDetectionActive, setJumpDetectionActive] = useState(false);
   
+  // The End page state
+  const [showTheEnd, setShowTheEnd] = useState(false);
+  
   // Navigation debouncing to prevent page skipping
   const navigationInProgress = useRef(false);
   const lastNavigationTime = useRef(0);
+
+  // Extract speech keyword from current page instruction
+  const getPageSpeechKeyword = useCallback((pageText) => {
+    if (!pageText) return null;
+    
+    console.log('🔍 Extracting keyword from text:', pageText);
+    
+    // Look for pattern: Say "keyword" to ... (with optional punctuation)
+    const sayPattern = /Say "([^"]+)"[!.]?\s+to/i;
+    const match = pageText.match(sayPattern);
+    
+    if (match) {
+      // Remove punctuation from the keyword
+      const keyword = match[1].toLowerCase().replace(/[!.,?]/g, '');
+      console.log('✅ Found keyword:', keyword);
+      return keyword;
+    }
+    
+    console.log('❌ No keyword pattern found');
+    return null;
+  }, []);
 
   // AI Story Generator
   const { generateAIStory, loading: aiLoading, error: aiError, setError: setAiError } = AIStoryGenerator({
@@ -260,11 +284,11 @@ export default function StoryPage() {
 
   // Stop listening for voice commands with improved reliability
   const stopListening = useCallback(() => {
-    console.log('🛑 Stopping speech recognition');
+    console.log('🛑 Stopping speech recognition', { isListening });
     
-    if (recognitionRef.current) {
+    if (recognitionRef.current && isListening) {
       try {
-        recognitionRef.current.abort(); // More immediate than stop()
+        // Only use stop() to avoid "aborted" error
         recognitionRef.current.stop();
       } catch (error) {
         console.warn('Error stopping speech recognition:', error);
@@ -273,7 +297,7 @@ export default function StoryPage() {
     
     setIsListening(false);
     setRecognizedText(''); // Clear recognized text
-  }, []);
+  }, [isListening]);
 
   // Activate jump detection on jungle scene (page 3, idx 2) for goodnight-zoo story
   useEffect(() => {
@@ -299,12 +323,31 @@ export default function StoryPage() {
     next();
   }, [next]);
 
+  // Cleanup speech recognition when showing "The End" page
+  useEffect(() => {
+    if (showTheEnd && isListening) {
+      console.log('🌙 Stopping speech recognition for The End page');
+      stopListening();
+    }
+  }, [showTheEnd, isListening, stopListening]);
+
   // Initialize speech recognition
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (SpeechRecognition) {
         setSpeechSupported(true);
+        
+        // Clean up any existing recognition instance
+        if (recognitionRef.current) {
+          try {
+            recognitionRef.current.stop();
+            recognitionRef.current.abort();
+          } catch (error) {
+            console.warn('Error cleaning up existing recognition:', error);
+          }
+        }
+        
         const recognition = new SpeechRecognition();
         recognition.continuous = true;
         recognition.interimResults = false; // Disable interim results to prevent multiple triggers
@@ -339,31 +382,77 @@ export default function StoryPage() {
             return;
           }
           
-          // Check for keywords to progress story
-          const keywords = ['lion', 'monkey', 'penguin', 'hippo', 'goodnight', "let's go", 'lets go'];
+          // Get the specific keyword for current page
+          const expectedKeyword = getPageSpeechKeyword(current?.text);
           const lowerTranscript = transcript.toLowerCase().trim();
           
-          console.log('🔍 Checking keywords in:', lowerTranscript);
+          console.log('🔍 Checking for page-specific keyword:', expectedKeyword, 'in transcript:', lowerTranscript);
+          console.log('📍 Current page info:', { idx, totalScenes: scenes.length, isLastPage: idx === scenes.length - 1 });
           
-          for (const keyword of keywords) {
-            if (lowerTranscript.includes(keyword)) {
-              console.log('✅ Keyword detected:', keyword, 'triggering navigation');
+          if (expectedKeyword && lowerTranscript.includes(expectedKeyword)) {
+            console.log('✅ Page-specific keyword detected:', expectedKeyword, 'triggering navigation');
+            
+            // Check if this is the final "goodnight" on the last page
+            if (expectedKeyword === "goodnight" && idx === scenes.length - 1) {
+              console.log('🌙 Final goodnight detected, showing The End page');
+              setShowTheEnd(true);
+              // Clear any voice errors since we're ending the story
+              setVoiceError('');
+            } else {
               // Progress to next scene
+              console.log('📄 Moving to next page');
               next();
-              // Stop listening after keyword detection
-              stopListening();
-              break;
+            }
+            
+            // Stop listening after keyword detection
+            stopListening();
+          } else if (expectedKeyword) {
+            console.log('🚫 Expected keyword not found. Looking for:', expectedKeyword);
+            console.log('🔍 Full transcript received:', lowerTranscript);
+            
+            // Special handling for "let's go" variations
+            if (expectedKeyword === "let's go" || expectedKeyword === "lets go") {
+              if (lowerTranscript.includes("lets go") || lowerTranscript.includes("let's go") || lowerTranscript.includes("lets go")) {
+                console.log('✅ "Let\'s go" variation detected, triggering navigation');
+                next();
+                stopListening();
+                return;
+              }
+            }
+            
+            // Special handling for "goodnight" variations
+            if (expectedKeyword === "goodnight") {
+              if (lowerTranscript.includes("good night") || lowerTranscript.includes("goodnight")) {
+                console.log('✅ "Goodnight" variation detected');
+                // Check if this is the final "goodnight" on the last page
+                if (idx === scenes.length - 1) {
+                  console.log('🌙 Final goodnight detected, showing The End page');
+                  setShowTheEnd(true);
+                  setVoiceError('');
+                } else {
+                  console.log('📄 Moving to next page');
+                  next();
+                }
+                stopListening();
+                return;
+              }
             }
           }
         };
         
         recognition.onerror = (event) => {
           console.error('Speech recognition error:', event.error);
-          setVoiceError(`Speech recognition error: ${event.error}`);
+          // Don't show "aborted" or "no-speech" errors to users
+          if (event.error !== 'aborted' && event.error !== 'no-speech') {
+            setVoiceError(`Speech recognition error: ${event.error}`);
+          } else if (event.error === 'no-speech') {
+            console.log('🔇 No speech detected - this is normal, you can try speaking again');
+          }
           setIsListening(false);
         };
         
         recognition.onend = () => {
+          console.log('🔚 Speech recognition ended');
           setIsListening(false);
         };
         
@@ -373,19 +462,48 @@ export default function StoryPage() {
         setSpeechSupported(false);
       }
     }
+    
+    // Cleanup on unmount
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+          recognitionRef.current.abort();
+        } catch (error) {
+          console.warn('Error cleaning up recognition on unmount:', error);
+        }
+      }
+    };
   }, [next]);
   
   // Start listening for voice commands
-  const startListening = () => {
+  const startListening = useCallback(() => {
     console.log('🎤 Starting speech recognition', {
       speechSupported,
       hasRecognition: !!recognitionRef.current,
-      currentPage: idx
+      currentPage: idx,
+      isCurrentlyListening: isListening
     });
     
     if (!speechSupported || !recognitionRef.current) {
       console.warn('🚫 Speech recognition not supported');
       setVoiceError('Speech recognition not supported in this browser');
+      return;
+    }
+    
+    // Stop any existing recognition first
+    if (isListening) {
+      console.log('🔄 Stopping existing recognition before starting new one');
+      try {
+        recognitionRef.current?.stop();
+      } catch (error) {
+        console.warn('Error stopping recognition:', error);
+      }
+      setIsListening(false);
+      // Wait a moment for cleanup
+      setTimeout(() => {
+        startListening();
+      }, 200);
       return;
     }
     
@@ -397,9 +515,14 @@ export default function StoryPage() {
       console.log('✅ Speech recognition started successfully');
     } catch (error) {
       console.error('❌ Failed to start speech recognition:', error);
-      setVoiceError('Failed to start voice recognition');
+      // Reset the listening state on error
+      setIsListening(false);
+      // Don't show the error if it's about already being started
+      if (!error.message.includes('already started')) {
+        setVoiceError('Failed to start voice recognition');
+      }
     }
-  };
+  }, [speechSupported, idx, isListening, stopListening]);
 
   // Handle story generation - always use AI
   const handleGenerate = useCallback(async (ideaArg) => {
@@ -579,6 +702,38 @@ export default function StoryPage() {
 
 
 
+  // Handle "The End" page
+  if (showTheEnd) {
+    return (
+      <main className="min-h-screen bg-gradient-to-br from-purple-100 via-blue-100 to-indigo-200">
+        <div className="container mx-auto px-4 py-8">
+          <div className="max-w-4xl mx-auto text-center">
+            <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-xl p-8 mb-8">
+              <h1 className="text-4xl md:text-6xl font-bold text-purple-800 mb-6">
+                🌟 The End 🌟
+              </h1>
+              <p className="text-xl md:text-2xl text-gray-700 mb-8">
+                What a wonderful bedtime story! All the animals at the zoo are now fast asleep, 
+                and it's time for you to have sweet dreams too.
+              </p>
+              <div className="space-y-4">
+                <p className="text-lg text-gray-600">
+                  Thank you for joining us on this magical journey! 🦁🐵🐧🦛
+                </p>
+                <button 
+                  onClick={() => window.location.href = '/play/idea'}
+                  className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 px-8 rounded-xl text-lg transition-colors shadow-lg"
+                >
+                  📚 Choose Another Story
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-white">
       {aiError && (
@@ -717,9 +872,17 @@ export default function StoryPage() {
                         <p className="text-sm text-blue-800 font-medium mb-1">
                           🎤 Voice Commands:
                         </p>
-                        <p className="text-xs text-blue-600">
-                          Listening starts automatically after reading! Say: &quot;Lion&quot;, &rdquo;Monkey&quot;, &quot;Penguin&quot;, &quot;Hippo&quot;, &quot;Let&apos;s go&quot;, or &quot;Goodnight&quot;
-                        </p>
+                        {(() => {
+                          const expectedKeyword = getPageSpeechKeyword(current?.text);
+                          return (
+                            <p className="text-xs text-blue-600">
+                              {expectedKeyword ? 
+                                `Say: "${expectedKeyword}" to continue!` : 
+                                'Listening for voice commands...'
+                              }
+                            </p>
+                          );
+                        })()}
                       </div>
                     </div>
                   )}
@@ -913,9 +1076,17 @@ export default function StoryPage() {
                         <p className="text-sm text-blue-800 font-medium mb-1">
                           🎤 Voice Commands:
                         </p>
-                        <p className="text-xs text-blue-600">
-                          Listening starts automatically after reading! Say: &quot;Lion&quot;, &quot;Monkey&quot;, &quot;Penguin&quot;, &quot;Hippo&quot;, &quot;Let&apos;s go&quot;, or &quot;Goodnight&quot;
-                        </p>
+                        {(() => {
+                          const expectedKeyword = getPageSpeechKeyword(current?.text);
+                          return (
+                            <p className="text-xs text-blue-600">
+                              {expectedKeyword ? 
+                                `Say: "${expectedKeyword}" to continue!` : 
+                                'Listening for voice commands...'
+                              }
+                            </p>
+                          );
+                        })()}
                       </div>
                     </div>
                   )}
