@@ -5,8 +5,8 @@ import { PollyClient, SynthesizeSpeechCommand, DescribeVoicesCommand } from '@aw
 const pollyClient = new PollyClient({
   region: process.env.AWS_POLLY_REGION || 'ap-southeast-1',
   credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    accessKeyId: process.env.APP_AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.APP_AWS_SECRET_ACCESS_KEY,
   },
 });
 
@@ -205,10 +205,17 @@ export async function GET(request) {
 
   } catch (error) {
     console.error('Get Voices API Error:', error);
-    
+
+    // Safely determine requested language
+    let requestedLanguage = 'en-US';
+    try {
+      const { searchParams } = new URL(request.url);
+      requestedLanguage = searchParams.get('language') || 'en-US';
+    } catch {}
+
     // Return fallback voices if API fails
     const fallbackVoices = Object.entries(CHILD_FRIENDLY_VOICES)
-      .filter(([id, info]) => info.language === (searchParams?.get('language') || 'en-US'))
+      .filter(([, info]) => info.language === requestedLanguage)
       .map(([id, info]) => ({
         Id: id,
         Name: id,
@@ -221,6 +228,6 @@ export async function GET(request) {
       voices: fallbackVoices,
       totalCount: fallbackVoices.length,
       fallback: true,
-    });
+    }, { status: 200 });
   }
 }
