@@ -653,7 +653,7 @@ export default function StoryPage() {
       
       return () => clearTimeout(timer);
     }
-  }, [current, isListening, isPaused, reading, speakCurrent, stopListening, storyId]); // Trigger when current scene or story changes
+  }, [current, isListening, tts.isPlaying, tts.isPaused, speakCurrent, stopListening, storyId]); // Trigger when current scene or story changes
 
 
   const startNewStory = useCallback(() => {
