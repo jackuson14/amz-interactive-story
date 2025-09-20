@@ -41,3 +41,7 @@ yarn-error.log*
 next-env.d.ts
 
 /logs
+
+# local files
+server.log
+playwright-report/
