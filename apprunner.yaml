@@ -5,11 +5,11 @@ build:
     pre-build:
       - echo "Installing dependencies"
     build:
-      - cd web && npm ci && npm run build
+      - cd web && npm ci --only=production && npm run build
     post-build:
       - echo "Build completed"
 run:
-  runtime-version: latest
+  runtime-version: "22"
   command: cd web && npm start
   network:
     port: 3000
