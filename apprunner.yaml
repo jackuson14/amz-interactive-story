@@ -4,7 +4,6 @@ build:
   commands:
     build:
       - echo "Installing dependencies..."
-      - cd web
       - npm ci
       - echo "Building Next.js application..."
       - npm run build
@@ -17,7 +16,7 @@ build:
 
 run:
   runtime-version: 18
-  command: cd web && npm start
+  command: npm start
   network:
     port: 3000
     env: PORT
