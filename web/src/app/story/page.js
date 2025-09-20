@@ -17,6 +17,7 @@ const CHARACTER_KEY = "character_v1";
 const STORY_PROMPT_KEY = "story_prompt_v1";
 
 export default function StoryPage() {
+  // Story page component
   const router = useRouter();
   const [selfie, setSelfie] = useState(null);
   const [idx, setIdx] = useState(0);
