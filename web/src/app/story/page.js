@@ -8,6 +8,7 @@ import Image from "next/image";
 import { SAMPLE_STORIES } from "@/data/stories";
 import { parseMarkdownStory } from "@/utils/markdownParser";
 import AIStoryGenerator from "@/components/AIStoryGenerator";
+import PoseDetection from "@/components/PoseDetection";
 
 
 const SELFIE_KEY = "selfie_v1";
@@ -46,6 +47,13 @@ export default function StoryPage() {
   const [recognizedText, setRecognizedText] = useState("");
   const [voiceError, setVoiceError] = useState("");
   const recognitionRef = useRef(null);
+
+  // Jump detection state
+  const [jumpDetectionActive, setJumpDetectionActive] = useState(false);
+  
+  // Navigation debouncing to prevent page skipping
+  const navigationInProgress = useRef(false);
+  const lastNavigationTime = useRef(0);
 
   // AI Story Generator
   const { generateAIStory, loading: aiLoading, error: aiError, setError: setAiError } = AIStoryGenerator({
@@ -216,8 +224,80 @@ export default function StoryPage() {
   }, [storyId, characterName, characterGender]);
 
   const current = scenes[idx];
-  const next = useCallback(() => setIdx((v) => Math.min(v + 1, scenes.length - 1)), [scenes.length]);
+  
+  // Debounced next function to prevent page skipping
+  const next = useCallback(() => {
+    const now = Date.now();
+    const timeSinceLastNav = now - lastNavigationTime.current;
+    
+    // Prevent multiple navigation calls within 1.5 seconds
+    if (navigationInProgress.current || timeSinceLastNav < 1500) {
+      console.log('🚫 Navigation blocked - too soon since last navigation', {
+        navigationInProgress: navigationInProgress.current,
+        timeSinceLastNav,
+        minimumDelay: 1500
+      });
+      return;
+    }
+    
+    navigationInProgress.current = true;
+    lastNavigationTime.current = now;
+    
+    console.log('📄 Navigating to next page', {
+      currentPage: idx,
+      nextPage: Math.min(idx + 1, scenes.length - 1)
+    });
+    
+    setIdx((v) => Math.min(v + 1, scenes.length - 1));
+    
+    // Reset navigation flag after a delay
+    setTimeout(() => {
+      navigationInProgress.current = false;
+    }, 1500);
+  }, [scenes.length, idx]);
+  
   const prev = () => setIdx((v) => Math.max(v - 1, 0));
+
+  // Stop listening for voice commands with improved reliability
+  const stopListening = useCallback(() => {
+    console.log('🛑 Stopping speech recognition');
+    
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort(); // More immediate than stop()
+        recognitionRef.current.stop();
+      } catch (error) {
+        console.warn('Error stopping speech recognition:', error);
+      }
+    }
+    
+    setIsListening(false);
+    setRecognizedText(''); // Clear recognized text
+  }, []);
+
+  // Activate jump detection on jungle scene (page 3, idx 2) for goodnight-zoo story
+  useEffect(() => {
+    const shouldActivateJumpDetection = 
+      storyId === "goodnight-zoo" && 
+      idx === 2 && 
+      scenes.length > 0;
+    
+    console.log('Jump detection check:', { storyId, idx, scenes: scenes.length, shouldActivate: shouldActivateJumpDetection });
+    
+    setJumpDetectionActive(shouldActivateJumpDetection);
+    
+    // Stop voice recognition when jump detection activates
+    if (shouldActivateJumpDetection && isListening) {
+      console.log('Stopping voice recognition for jump detection');
+      stopListening();
+    }
+  }, [storyId, idx, scenes.length, isListening, stopListening]);
+
+  // Handle jump detection
+  const handleJumpDetected = useCallback(() => {
+    console.log('Jump detected! Moving to next scene...');
+    next();
+  }, [next]);
 
   // Initialize speech recognition
   useEffect(() => {
@@ -227,7 +307,7 @@ export default function StoryPage() {
         setSpeechSupported(true);
         const recognition = new SpeechRecognition();
         recognition.continuous = true;
-        recognition.interimResults = true;
+        recognition.interimResults = false; // Disable interim results to prevent multiple triggers
         recognition.lang = 'en-US';
         
         recognition.onresult = (event) => {
@@ -235,15 +315,39 @@ export default function StoryPage() {
           for (let i = event.resultIndex; i < event.results.length; i++) {
             transcript += event.results[i][0].transcript;
           }
+          
+          console.log('🎤 Speech recognition result:', {
+            transcript,
+            resultIndex: event.resultIndex,
+            resultsLength: event.results.length,
+            isFinal: event.results[event.results.length - 1].isFinal,
+            currentPage: idx
+          });
+          
           setRecognizedText(transcript);
+          
+          // Only process final results to prevent multiple triggers
+          const lastResult = event.results[event.results.length - 1];
+          if (!lastResult.isFinal) {
+            console.log('🚫 Ignoring interim result');
+            return;
+          }
+          
+          // Don't process if navigation is already in progress
+          if (navigationInProgress.current) {
+            console.log('🚫 Navigation already in progress, ignoring speech result');
+            return;
+          }
           
           // Check for keywords to progress story
           const keywords = ['lion', 'monkey', 'penguin', 'hippo', 'goodnight', "let's go", 'lets go'];
-          const lowerTranscript = transcript.toLowerCase();
+          const lowerTranscript = transcript.toLowerCase().trim();
+          
+          console.log('🔍 Checking keywords in:', lowerTranscript);
           
           for (const keyword of keywords) {
             if (lowerTranscript.includes(keyword)) {
-              console.log('Keyword detected:', keyword);
+              console.log('✅ Keyword detected:', keyword, 'triggering navigation');
               // Progress to next scene
               next();
               // Stop listening after keyword detection
@@ -273,7 +377,14 @@ export default function StoryPage() {
   
   // Start listening for voice commands
   const startListening = () => {
+    console.log('🎤 Starting speech recognition', {
+      speechSupported,
+      hasRecognition: !!recognitionRef.current,
+      currentPage: idx
+    });
+    
     if (!speechSupported || !recognitionRef.current) {
+      console.warn('🚫 Speech recognition not supported');
       setVoiceError('Speech recognition not supported in this browser');
       return;
     }
@@ -283,18 +394,11 @@ export default function StoryPage() {
       setRecognizedText('');
       recognitionRef.current.start();
       setIsListening(true);
+      console.log('✅ Speech recognition started successfully');
     } catch (error) {
-      console.error('Failed to start speech recognition:', error);
+      console.error('❌ Failed to start speech recognition:', error);
       setVoiceError('Failed to start voice recognition');
     }
-  };
-  
-  // Stop listening for voice commands
-  const stopListening = () => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-    }
-    setIsListening(false);
   };
 
   // Handle story generation - always use AI
@@ -552,14 +656,26 @@ export default function StoryPage() {
               {/* Story content */}
               <div className="text-white drop-shadow-lg">
                 <h2 className="text-3xl md:text-4xl font-extrabold mb-6 drop-shadow-lg">{current.title}</h2>
-                <p className="text-xl md:text-2xl leading-relaxed mb-8 drop-shadow-lg">{current.text}</p>
+                <p className="text-xl md:text-2xl leading-relaxed mb-4 drop-shadow-lg">{current.text}</p>
+                
+                {/* Special jump instruction for jungle scene */}
+                {jumpDetectionActive && (
+                  <div className="mb-4 p-4 bg-green-500/90 backdrop-blur-sm rounded-lg border-2 border-green-300">
+                    <p className="text-white text-lg font-bold text-center drop-shadow-lg">
+                      🐒 Jump like a monkey to swing to the next page! 🐒
+                    </p>
+                    <p className="text-white/90 text-sm text-center mt-1">
+                      Stand back from your camera and jump up and down!
+                    </p>
+                  </div>
+                )}
 
                 {/* Navigation buttons */}
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                   <button onClick={prev} disabled={idx === 0} className="w-full sm:w-auto rounded-md bg-white/90 border border-gray-300 px-5 py-3 text-lg text-gray-700 disabled:opacity-40 hover:bg-white">Previous</button>
                   
-                  {/* Voice recognition controls */}
-                  {speechSupported && (
+                  {/* Voice recognition controls - disabled on jungle scene */}
+                  {speechSupported && !jumpDetectionActive && (
                     <div className="w-full">
                       {!isListening ? (
                         <button 
@@ -738,12 +854,24 @@ export default function StoryPage() {
                 <div>
                   <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900">{current.title}</h2>
                   <p className="mt-4 text-lg md:text-xl leading-relaxed text-gray-800">{current.text}</p>
+                  
+                  {/* Special jump instruction for jungle scene */}
+                  {jumpDetectionActive && (
+                    <div className="mt-4 p-4 bg-green-100 border-2 border-green-300 rounded-lg">
+                      <p className="text-green-800 text-lg font-bold text-center">
+                        🐒 Jump like a monkey to swing to the next page! 🐒
+                      </p>
+                      <p className="text-green-700 text-sm text-center mt-1">
+                        Stand back from your camera and jump up and down!
+                      </p>
+                    </div>
+                  )}
                 </div>
                 <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                   <button onClick={prev} disabled={idx === 0} className="w-full sm:w-auto rounded-md border border-gray-300 px-5 py-3 text-lg text-gray-700 disabled:opacity-40 hover:bg-gray-100">Previous</button>
                   
-                  {/* Voice recognition controls */}
-                  {speechSupported && (
+                  {/* Voice recognition controls - disabled on jungle scene */}
+                  {speechSupported && !jumpDetectionActive && (
                     <div className="w-full">
                       {!isListening ? (
                         <button 
@@ -852,6 +980,12 @@ export default function StoryPage() {
         </section>
         </>
       )}
+
+      {/* Jump detection component for jungle scene */}
+      <PoseDetection 
+        isActive={jumpDetectionActive}
+        onJumpDetected={handleJumpDetected}
+      />
 
     </main>
   );
