@@ -9,6 +9,8 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@aws-sdk/client-polly": "^3.893.0",
+    "@aws-sdk/credential-providers": "^3.893.0",
     "@google/genai": "^1.20.0",
     "@imgly/background-removal": "^1.7.0",
     "@mediapipe/tasks-vision": "^0.10.22-rc.20250304",

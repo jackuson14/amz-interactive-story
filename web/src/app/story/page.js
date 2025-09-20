@@ -9,6 +9,7 @@ import { SAMPLE_STORIES } from "@/data/stories";
 import { parseMarkdownStory } from "@/utils/markdownParser";
 import AIStoryGenerator from "@/components/AIStoryGenerator";
 import PoseDetection from "@/components/PoseDetection";
+import { useTTS } from "@/hooks/useTTS";
 
 
 const SELFIE_KEY = "selfie_v1";
@@ -16,6 +17,7 @@ const CHARACTER_KEY = "character_v1";
 const STORY_PROMPT_KEY = "story_prompt_v1";
 
 export default function StoryPage() {
+  // Story page component
   const router = useRouter();
   const [selfie, setSelfie] = useState(null);
   const [idx, setIdx] = useState(0);
@@ -37,9 +39,15 @@ export default function StoryPage() {
 
   const autoGenDone = useRef(false);
 
-  // Read-aloud state
-  const [reading, setReading] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
+  // AWS Polly TTS integration
+  const tts = useTTS({
+    defaultVoice: 'Ivy', // Child-friendly default voice
+    onEnd: () => {
+      if (speechSupported && !isListening) {
+        startListening();
+      }
+    }
+  });
 
   // Voice recognition state
   const [isListening, setIsListening] = useState(false);
@@ -586,81 +594,54 @@ export default function StoryPage() {
     } catch {}
   }, [customScenes, messages.length, handleGenerate, storyId]);
 
-  // Read-aloud helpers with play/pause support
-  const speakCurrent = () => {
+  // AWS Polly TTS functions
+  const speakCurrent = async () => {
     try {
-      if (typeof window === 'undefined') return;
-      const s = window.speechSynthesis;
-      if (!s || !current) return;
+      if (!current) return;
       
       // If paused, resume
-      if (isPaused) {
-        s.resume();
-        setIsPaused(false);
-        setReading(true);
+      if (tts.isPaused) {
+        tts.play();
         return;
       }
       
-      // Start new speech
-      const u = new SpeechSynthesisUtterance(`${current.title}. ${current.text}`);
-      u.rate = 0.95; // slightly slower for kids
-      u.pitch = 1.05; // a bit brighter
-      u.onend = () => { 
-        setReading(false); 
-        setIsPaused(false);
-        // Auto-start listening after read-aloud finishes
-        if (speechSupported && !isListening) {
-          setTimeout(() => {
-            startListening();
-          }, 500); // Small delay to ensure speech has fully ended
-        }
-      };
-      u.onpause = () => {
-        setIsPaused(true);
-        setReading(false);
-      };
-      s.cancel();
-      s.speak(u);
-      setReading(true);
-      setIsPaused(false);
-
-    } catch {}
+      // Create story text with character name replacement
+      const storyText = `${current.title}. ${current.text}`;
+      const personalizedText = storyText.replace(/Lily/g, characterName);
+      
+      // Stop current audio and synthesize new speech
+      
+      const result = await tts.synthesizeAndPlay(personalizedText);
+      
+      if (result.success) {
+        // Auto-start listening after read-aloud finishes (when audio ends)
+        // This will be handled by the audio 'ended' event in useTTS hook
+      }
+    } catch (error) {
+      console.error('Error speaking current scene:', error);
+    }
   };
 
   const pauseReading = () => {
-    try {
-      if (typeof window === 'undefined') return;
-      const s = window.speechSynthesis;
-      if (!s) return;
-      s.pause();
-      setIsPaused(true);
-      setReading(false);
-    } catch {}
+    tts.pause();
   };
 
   const stopReading = () => {
-    try {
-      if (typeof window === 'undefined') return;
-      const s = window.speechSynthesis;
-      if (!s) return;
-      s.cancel();
-      setReading(false);
-      setIsPaused(false);
-      // Stop listening when read-aloud is manually stopped
-      if (isListening) {
-        stopListening();
-      }
-    } catch {}
+    tts.stop();
+    // Stop listening when read-aloud is manually stopped
+    if (isListening) {
+      stopListening();
+    }
   };
-  // If reading, re-speak when scene changes
+  // If playing, re-speak when scene changes
   useEffect(() => {
-    if (reading) speakCurrent();
+    if (tts.isPlaying) speakCurrent();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idx, scenes]);
 
   // Auto-play when story loads or scene changes
   useEffect(() => {
-    if (current && !reading && !isPaused) {
+    if (current && !tts.isPlaying && !tts.isPaused) {
       // Stop any existing listening when scene changes
       if (isListening) {
         stopListening();
@@ -887,54 +868,134 @@ export default function StoryPage() {
                     </div>
                   )}
                   
-                  {/* Play/Pause/Stop audio controls */}
-                  <div className="flex gap-2">
-                    {!reading && !isPaused && (
-                      <button 
-                        onClick={speakCurrent} 
-                        className="flex items-center gap-2 rounded-md bg-green-500 hover:bg-green-600 text-white px-5 py-3 text-lg transition-colors"
+                  {/* AWS Polly TTS Controls */}
+                  <div className="flex flex-col gap-3">
+                    {/* Voice Selection */}
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm font-medium text-white drop-shadow-lg">Voice:</label>
+                      <select 
+                        value={tts.selectedVoice} 
+                        onChange={(e) => tts.setSelectedVoice(e.target.value)}
+                        className="text-sm bg-white/90 border border-gray-300 rounded px-2 py-1 text-gray-800"
                       >
-                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M8 5v14l11-7z"/>
-                        </svg>
-                        Play
-                      </button>
+                        {tts.availableVoices.map(voice => (
+                          <option key={voice.Id} value={voice.Id}>
+                            {voice.Id} ({voice.gender}) {voice.isRecommended ? '⭐' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    {/* Volume Control */}
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm font-medium text-white drop-shadow-lg">Volume:</label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.1"
+                        value={tts.volume || 0.9}
+                        onChange={(e) => tts.setVolume(parseFloat(e.target.value))}
+                        className="flex-1 bg-white/30 rounded-lg h-2 slider"
+                      />
+                      <span className="text-sm text-white drop-shadow-lg min-w-[3rem]">
+                        {Math.round((tts.volume || 0.9) * 100)}%
+                      </span>
+                    </div>
+                    
+                    {/* Natural Speech Toggle */}
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm font-medium text-white drop-shadow-lg">Natural Speech:</label>
+                      <input
+                        type="checkbox"
+                        checked={tts.naturalSpeech}
+                        onChange={(e) => tts.setNaturalSpeech(e.target.checked)}
+                        className="rounded"
+                      />
+                      <span className="text-xs text-white/80 drop-shadow-lg">
+                        {tts.naturalSpeech ? 'Enhanced' : 'Standard'}
+                      </span>
+                    </div>
+                    
+                    {/* Play/Pause/Stop Controls */}
+                    <div className="flex gap-2">
+                      {tts.isLoading && (
+                        <div className="flex items-center gap-2 text-white">
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                          <span>Generating speech...</span>
+                        </div>
+                      )}
+                      
+                      {!tts.isPlaying && !tts.isPaused && !tts.isLoading && (
+                        <button 
+                          onClick={speakCurrent} 
+                          className="flex items-center gap-2 rounded-md bg-green-500 hover:bg-green-600 text-white px-5 py-3 text-lg transition-colors"
+                        >
+                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M8 5v14l11-7z"/>
+                          </svg>
+                          Play with Polly
+                        </button>
+                      )}
+                      
+                      {tts.isPlaying && (
+                        <button 
+                          onClick={pauseReading} 
+                          className="flex items-center gap-2 rounded-md bg-yellow-500 hover:bg-yellow-600 text-white px-5 py-3 text-lg transition-colors"
+                        >
+                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+                          </svg>
+                          Pause
+                        </button>
+                      )}
+                      
+                      {tts.isPaused && (
+                        <button 
+                          onClick={speakCurrent} 
+                          className="flex items-center gap-2 rounded-md bg-green-500 hover:bg-green-600 text-white px-5 py-3 text-lg transition-colors"
+                        >
+                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M8 5v14l11-7z"/>
+                          </svg>
+                          Resume
+                        </button>
+                      )}
+                      
+                      {(tts.isPlaying || tts.isPaused) && (
+                        <button 
+                          onClick={stopReading} 
+                          className="flex items-center gap-2 rounded-md bg-red-500 hover:bg-red-600 text-white px-5 py-3 text-lg transition-colors"
+                        >
+                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M6 6h12v12H6z"/>
+                          </svg>
+                          Stop
+                        </button>
+                      )}
+                    </div>
+                    
+                    {/* Progress Bar */}
+                    {tts.duration > 0 && (
+                      <div className="w-full">
+                        <div className="flex justify-between text-xs text-white/80 mb-1">
+                          <span>{Math.floor(tts.progress * tts.duration / 100 / 60)}:{Math.floor((tts.progress * tts.duration / 100) % 60).toString().padStart(2, '0')}</span>
+                          <span>{Math.floor(tts.duration / 60)}:{Math.floor(tts.duration % 60).toString().padStart(2, '0')}</span>
+                        </div>
+                        <div className="w-full bg-white/30 rounded-full h-2">
+                          <div 
+                            className="bg-white h-2 rounded-full transition-all duration-300" 
+                            style={{ width: `${tts.progress}%` }}
+                          ></div>
+                        </div>
+                      </div>
                     )}
                     
-                    {reading && (
-                      <button 
-                        onClick={pauseReading} 
-                        className="flex items-center gap-2 rounded-md bg-yellow-500 hover:bg-yellow-600 text-white px-5 py-3 text-lg transition-colors"
-                      >
-                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
-                        </svg>
-                        Pause
-                      </button>
-                    )}
-                    
-                    {isPaused && (
-                      <button 
-                        onClick={speakCurrent} 
-                        className="flex items-center gap-2 rounded-md bg-green-500 hover:bg-green-600 text-white px-5 py-3 text-lg transition-colors"
-                      >
-                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M8 5v14l11-7z"/>
-                        </svg>
-                        Resume
-                      </button>
-                    )}
-                    
-                    {(reading || isPaused) && (
-                      <button 
-                        onClick={stopReading} 
-                        className="flex items-center gap-2 rounded-md bg-red-500 hover:bg-red-600 text-white px-5 py-3 text-lg transition-colors"
-                      >
-                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M6 6h12v12H6z"/>
-                        </svg>
-                        Stop
-                      </button>
+                    {/* Error Display */}
+                    {tts.error && (
+                      <div className="text-red-200 text-sm bg-red-500/20 rounded px-2 py-1">
+                        {tts.error}
+                      </div>
                     )}
                   </div>
                   
@@ -1091,54 +1152,134 @@ export default function StoryPage() {
                     </div>
                   )}
                   
-                  {/* Play/Pause/Stop audio controls */}
-                  <div className="flex gap-2">
-                    {!reading && !isPaused && (
-                      <button 
-                        onClick={speakCurrent} 
-                        className="flex items-center gap-2 rounded-md bg-green-500 hover:bg-green-600 text-white px-5 py-3 text-lg transition-colors"
+                  {/* AWS Polly TTS Controls */}
+                  <div className="flex flex-col gap-3">
+                    {/* Voice Selection */}
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm font-medium text-white drop-shadow-lg">Voice:</label>
+                      <select 
+                        value={tts.selectedVoice} 
+                        onChange={(e) => tts.setSelectedVoice(e.target.value)}
+                        className="text-sm bg-white/90 border border-gray-300 rounded px-2 py-1 text-gray-800"
                       >
-                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M8 5v14l11-7z"/>
-                        </svg>
-                        Play
-                      </button>
+                        {tts.availableVoices.map(voice => (
+                          <option key={voice.Id} value={voice.Id}>
+                            {voice.Id} ({voice.gender}) {voice.isRecommended ? '⭐' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    {/* Volume Control */}
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm font-medium text-white drop-shadow-lg">Volume:</label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.1"
+                        value={tts.volume || 0.9}
+                        onChange={(e) => tts.setVolume(parseFloat(e.target.value))}
+                        className="flex-1 bg-white/30 rounded-lg h-2 slider"
+                      />
+                      <span className="text-sm text-white drop-shadow-lg min-w-[3rem]">
+                        {Math.round((tts.volume || 0.9) * 100)}%
+                      </span>
+                    </div>
+                    
+                    {/* Natural Speech Toggle */}
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm font-medium text-white drop-shadow-lg">Natural Speech:</label>
+                      <input
+                        type="checkbox"
+                        checked={tts.naturalSpeech}
+                        onChange={(e) => tts.setNaturalSpeech(e.target.checked)}
+                        className="rounded"
+                      />
+                      <span className="text-xs text-white/80 drop-shadow-lg">
+                        {tts.naturalSpeech ? 'Enhanced' : 'Standard'}
+                      </span>
+                    </div>
+                    
+                    {/* Play/Pause/Stop Controls */}
+                    <div className="flex gap-2">
+                      {tts.isLoading && (
+                        <div className="flex items-center gap-2 text-white">
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                          <span>Generating speech...</span>
+                        </div>
+                      )}
+                      
+                      {!tts.isPlaying && !tts.isPaused && !tts.isLoading && (
+                        <button 
+                          onClick={speakCurrent} 
+                          className="flex items-center gap-2 rounded-md bg-green-500 hover:bg-green-600 text-white px-5 py-3 text-lg transition-colors"
+                        >
+                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M8 5v14l11-7z"/>
+                          </svg>
+                          Play with Polly
+                        </button>
+                      )}
+                      
+                      {tts.isPlaying && (
+                        <button 
+                          onClick={pauseReading} 
+                          className="flex items-center gap-2 rounded-md bg-yellow-500 hover:bg-yellow-600 text-white px-5 py-3 text-lg transition-colors"
+                        >
+                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+                          </svg>
+                          Pause
+                        </button>
+                      )}
+                      
+                      {tts.isPaused && (
+                        <button 
+                          onClick={speakCurrent} 
+                          className="flex items-center gap-2 rounded-md bg-green-500 hover:bg-green-600 text-white px-5 py-3 text-lg transition-colors"
+                        >
+                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M8 5v14l11-7z"/>
+                          </svg>
+                          Resume
+                        </button>
+                      )}
+                      
+                      {(tts.isPlaying || tts.isPaused) && (
+                        <button 
+                          onClick={stopReading} 
+                          className="flex items-center gap-2 rounded-md bg-red-500 hover:bg-red-600 text-white px-5 py-3 text-lg transition-colors"
+                        >
+                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M6 6h12v12H6z"/>
+                          </svg>
+                          Stop
+                        </button>
+                      )}
+                    </div>
+                    
+                    {/* Progress Bar */}
+                    {tts.duration > 0 && (
+                      <div className="w-full">
+                        <div className="flex justify-between text-xs text-white/80 mb-1">
+                          <span>{Math.floor(tts.progress * tts.duration / 100 / 60)}:{Math.floor((tts.progress * tts.duration / 100) % 60).toString().padStart(2, '0')}</span>
+                          <span>{Math.floor(tts.duration / 60)}:{Math.floor(tts.duration % 60).toString().padStart(2, '0')}</span>
+                        </div>
+                        <div className="w-full bg-white/30 rounded-full h-2">
+                          <div 
+                            className="bg-white h-2 rounded-full transition-all duration-300" 
+                            style={{ width: `${tts.progress}%` }}
+                          ></div>
+                        </div>
+                      </div>
                     )}
                     
-                    {reading && (
-                      <button 
-                        onClick={pauseReading} 
-                        className="flex items-center gap-2 rounded-md bg-yellow-500 hover:bg-yellow-600 text-white px-5 py-3 text-lg transition-colors"
-                      >
-                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
-                        </svg>
-                        Pause
-                      </button>
-                    )}
-                    
-                    {isPaused && (
-                      <button 
-                        onClick={speakCurrent} 
-                        className="flex items-center gap-2 rounded-md bg-green-500 hover:bg-green-600 text-white px-5 py-3 text-lg transition-colors"
-                      >
-                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M8 5v14l11-7z"/>
-                        </svg>
-                        Resume
-                      </button>
-                    )}
-                    
-                    {(reading || isPaused) && (
-                      <button 
-                        onClick={stopReading} 
-                        className="flex items-center gap-2 rounded-md bg-red-500 hover:bg-red-600 text-white px-5 py-3 text-lg transition-colors"
-                      >
-                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M6 6h12v12H6z"/>
-                        </svg>
-                        Stop
-                      </button>
+                    {/* Error Display */}
+                    {tts.error && (
+                      <div className="text-red-200 text-sm bg-red-500/20 rounded px-2 py-1">
+                        {tts.error}
+                      </div>
                     )}
                   </div>
                   
