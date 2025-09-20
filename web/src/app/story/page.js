@@ -672,7 +672,7 @@ export default function StoryPage() {
       
       return () => clearTimeout(timer);
     }
-  }, [current, storyId]); // Trigger when current scene or story changes
+  }, [current, isListening, isPaused, reading, speakCurrent, stopListening, storyId]); // Trigger when current scene or story changes
 
 
   const startNewStory = useCallback(() => {
@@ -713,8 +713,8 @@ export default function StoryPage() {
                 🌟 The End 🌟
               </h1>
               <p className="text-xl md:text-2xl text-gray-700 mb-8">
-                What a wonderful bedtime story! All the animals at the zoo are now fast asleep, 
-                and it's time for you to have sweet dreams too.
+                What a wonderful bedtime story! All the animals at the zoo are now fast asleep,
+                and it&apos;s time for you to have sweet dreams too.
               </p>
               <div className="space-y-4">
                 <p className="text-lg text-gray-600">
