@@ -1,33 +1,23 @@
 version: 1.0
-runtime: nodejs22
+runtime: NODEJS_22
 build:
   commands:
+    pre-build:
+      - echo "Installing dependencies"
     build:
-      - echo "Node.js version:"
-      - node --version
-      - echo "NPM version:"
-      - npm --version
-      - echo "Installing dependencies..."
-      - npm ci --production=false
-      - echo "Building Next.js application without Turbopack..."
-      - npx next build
-      - echo "Build completed successfully"
-  env:
-    - name: NODE_ENV
-      value: production
-    - name: NEXT_TELEMETRY_DISABLED
-      value: "1"
-
+      - npm ci
+      - npm run build
+    post-build:
+      - echo "Build completed"
 run:
-  runtime-version: 22
+  runtime-version: latest
   command: npm start
   network:
     port: 3000
-    env: PORT
   env:
     - name: NODE_ENV
       value: production
     - name: PORT
-      value: "3000"
+      value: 3000
     - name: NEXT_TELEMETRY_DISABLED
       value: "1"
