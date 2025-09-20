@@ -41,6 +41,11 @@ export default function StoryPage() {
   // AWS Polly TTS integration
   const tts = useTTS({
     defaultVoice: 'Ivy', // Child-friendly default voice
+    onEnd: () => {
+      if (speechSupported && !isListening) {
+        startListening();
+      }
+    }
   });
 
   // Voice recognition state
@@ -604,18 +609,12 @@ export default function StoryPage() {
       const personalizedText = storyText.replace(/Lily/g, characterName);
       
       // Stop current audio and synthesize new speech
-      tts.stop();
       
       const result = await tts.synthesizeAndPlay(personalizedText);
       
       if (result.success) {
         // Auto-start listening after read-aloud finishes (when audio ends)
         // This will be handled by the audio 'ended' event in useTTS hook
-        if (speechSupported && !isListening) {
-          setTimeout(() => {
-            startListening();
-          }, 500);
-        }
       }
     } catch (error) {
       console.error('Error speaking current scene:', error);

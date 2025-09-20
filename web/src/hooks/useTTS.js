@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
 export const useTTS = (options = {}) => {
+  const { onEnd } = options;
   const [isLoading, setIsLoading] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -54,6 +55,7 @@ export const useTTS = (options = {}) => {
   };
 
   const synthesizeAndPlay = async (text, voice = null) => {
+    stop(); // Stop any currently playing audio first.
     try {
       setIsLoading(true);
       setError(null);
@@ -93,12 +95,6 @@ export const useTTS = (options = {}) => {
       );
       
       const audioUrl = URL.createObjectURL(audioBlob);
-      
-      // Stop current audio if playing
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
 
       // Create new audio element
       const audio = new Audio(audioUrl);
@@ -125,6 +121,9 @@ export const useTTS = (options = {}) => {
         if (progressInterval.current) {
           clearInterval(progressInterval.current);
         }
+        if (onEnd) {
+          onEnd();
+        }
       });
 
       audio.addEventListener('error', (e) => {
@@ -135,9 +134,18 @@ export const useTTS = (options = {}) => {
       });
 
       // Play the audio
-      await audio.play();
-      setIsPlaying(true);
-      setIsPaused(false);
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.then(() => {
+          setIsPlaying(true);
+          setIsPaused(false);
+        }).catch(error => {
+          console.error("Audio playback failed", error);
+          setError('Audio playback failed');
+          setIsPlaying(false);
+          setIsPaused(false);
+        });
+      }
 
       // Clean up the blob URL after a delay
       setTimeout(() => {
@@ -175,13 +183,20 @@ export const useTTS = (options = {}) => {
   }, [isPlaying]);
 
   const stop = useCallback(() => {
+    if (progressInterval.current) {
+      clearInterval(progressInterval.current);
+      progressInterval.current = null;
+    }
     if (audioRef.current) {
       audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      setIsPlaying(false);
-      setIsPaused(false);
-      setProgress(0);
+      audioRef.current.src = ''; // Detach the source
+      audioRef.current.load(); // aborts the download and resets the element
+      audioRef.current = null;
     }
+    setIsPlaying(false);
+    setIsPaused(false);
+    setProgress(0);
+    setDuration(0);
   }, []);
 
   const setVolume = useCallback((newVolume) => {
