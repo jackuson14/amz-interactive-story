@@ -5,8 +5,7 @@ build:
     pre-build:
       - echo "Installing dependencies"
     build:
-      - cd web && npm ci
-      - cd web && npm run build
+      - cd web && npm ci && npm run build
     post-build:
       - echo "Build completed"
 run:
