@@ -618,8 +618,13 @@ export default function StoryPage() {
       // Create story text with character name replacement (title removed from UI, so don't include in speech)
       const personalizedText = current.text.replace(/Lily/g, characterName);
 
+      // Append the voice instruction at the end (for non-final scenes)
+      const kw = getExpectedKeyword();
+      const instructionToSpeak = kw ? (current.instruction || `Say "${kw}" to go to the next page.`) : null;
+      const finalText = instructionToSpeak ? `${personalizedText} ${instructionToSpeak}` : personalizedText;
+
       // Stop current audio and synthesize new speech
-      const result = await tts.synthesizeAndPlay(personalizedText);
+      const result = await tts.synthesizeAndPlay(finalText);
 
       if (result.success) {
         // Auto-start listening after read-aloud finishes
