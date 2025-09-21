@@ -1011,88 +1011,11 @@ export default function StoryPage() {
                           <p className="text-sm text-red-800">{voiceError}</p>
                         </div>
                       )}
-
-                      <div className="mt-2 p-2 bg-white/90 rounded-lg border border-blue-200">
-                        <p className="text-sm text-blue-800 font-medium mb-1">
-                          🎤 Voice Commands:
-                        </p>
-                        {(() => {
-                          if (!hasUserInteracted) {
-                            return (
-                              <p className="text-xs text-gray-600">
-                                🎬 Click &quot;Start Story&quot; to begin audio and voice commands
-                              </p>
-                            );
-                          }
-                          const expectedKeyword = getExpectedKeyword();
-                          if (tts.isPlaying) {
-                            return (
-                              <p className="text-xs text-orange-600">
-                                🔊 Reading story... Voice recognition will start when finished.
-                              </p>
-                            );
-                          }
-                          return (
-                            <p className="text-xs text-blue-600">
-                              {expectedKeyword ?
-                                `Say: "${expectedKeyword}" to continue!` :
-                                'Listening for voice commands...'
-                              }
-                            </p>
-                          );
-                        })()}
-                      </div>
                     </div>
                   )}
 
                   {/* AWS Polly TTS Controls */}
                   <div className="flex flex-col gap-3">
-                    {/* Voice Selection */}
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm font-medium text-white drop-shadow-lg">Voice:</label>
-                      <select
-                        value={tts.selectedVoice}
-                        onChange={(e) => tts.setSelectedVoice(e.target.value)}
-                        className="text-sm bg-white/90 border border-gray-300 rounded px-2 py-1 text-gray-800"
-                      >
-                        {tts.availableVoices.map(voice => (
-                          <option key={voice.Id} value={voice.Id}>
-                            {voice.Id} ({voice.gender}) {voice.isRecommended ? '⭐' : ''}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Volume Control */}
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm font-medium text-white drop-shadow-lg">Volume:</label>
-                      <input
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.1"
-                        value={tts.volume || 0.9}
-                        onChange={(e) => tts.setVolume(parseFloat(e.target.value))}
-                        className="flex-1 bg-white/30 rounded-lg h-2 slider"
-                      />
-                      <span className="text-sm text-white drop-shadow-lg min-w-[3rem]">
-                        {Math.round((tts.volume || 0.9) * 100)}%
-                      </span>
-                    </div>
-
-                    {/* Natural Speech Toggle */}
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm font-medium text-white drop-shadow-lg">Natural Speech:</label>
-                      <input
-                        type="checkbox"
-                        checked={tts.naturalSpeech}
-                        onChange={(e) => tts.setNaturalSpeech(e.target.checked)}
-                        className="rounded"
-                      />
-                      <span className="text-xs text-white/80 drop-shadow-lg">
-                        {tts.naturalSpeech ? 'Enhanced' : 'Standard'}
-                      </span>
-                    </div>
 
                     {/* Play/Pause/Stop Controls */}
                     <div className="flex gap-2">
@@ -1111,7 +1034,7 @@ export default function StoryPage() {
                           <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M8 5v14l11-7z"/>
                           </svg>
-                          Play with Polly
+                          Play
                         </button>
                       )}
 
@@ -1151,22 +1074,6 @@ export default function StoryPage() {
                         </button>
                       )}
                     </div>
-
-                    {/* Progress Bar */}
-                    {tts.duration > 0 && (
-                      <div className="w-full">
-                        <div className="flex justify-between text-xs text-white/80 mb-1">
-                          <span>{Math.floor(tts.progress * tts.duration / 100 / 60)}:{Math.floor((tts.progress * tts.duration / 100) % 60).toString().padStart(2, '0')}</span>
-                          <span>{Math.floor(tts.duration / 60)}:{Math.floor(tts.duration % 60).toString().padStart(2, '0')}</span>
-                        </div>
-                        <div className="w-full bg-white/30 rounded-full h-2">
-                          <div
-                            className="bg-white h-2 rounded-full transition-all duration-300"
-                            style={{ width: `${tts.progress}%` }}
-                          ></div>
-                        </div>
-                      </div>
-                    )}
 
                     {/* Error Display */}
                     {tts.error && (
@@ -1318,37 +1225,6 @@ export default function StoryPage() {
                           <p className="text-sm text-red-800">{voiceError}</p>
                         </div>
                       )}
-
-                      <div className="mt-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
-                        <p className="text-sm text-blue-800 font-medium mb-1">
-                          🎤 Voice Commands:
-                        </p>
-                        {(() => {
-                          if (!hasUserInteracted) {
-                            return (
-                              <p className="text-xs text-gray-600">
-                                🎬 Click &quot;Start Story&quot; to begin audio and voice commands
-                              </p>
-                            );
-                          }
-                          const expectedKeyword = getExpectedKeyword();
-                          if (tts.isPlaying) {
-                            return (
-                              <p className="text-xs text-orange-600">
-                                🔊 Reading story... Voice recognition will start when finished.
-                              </p>
-                            );
-                          }
-                          return (
-                            <p className="text-xs text-blue-600">
-                              {expectedKeyword ?
-                                `Say: "${expectedKeyword}" to continue!` :
-                                'Listening for voice commands...'
-                              }
-                            </p>
-                          );
-                        })()}
-                      </div>
                     </div>
                   )}
 
