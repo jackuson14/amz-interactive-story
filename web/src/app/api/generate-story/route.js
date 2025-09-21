@@ -1,3 +1,5 @@
+export const runtime = 'nodejs';
+
 import { GoogleGenAI } from '@google/genai';
 import mime from 'mime';
 import { NextResponse } from 'next/server';
