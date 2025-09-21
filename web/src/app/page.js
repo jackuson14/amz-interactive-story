@@ -4,35 +4,50 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-gradient-to-br from-orange-50 via-yellow-50 to-blue-50">
       {/* Hero */}
-      <section className="px-6 sm:px-10 md:px-16 py-20 sm:py-28 text-center relative overflow-hidden">
-        {/* Decorative shapes */}
-        <div className="absolute top-10 left-10 w-20 h-20 bg-gradient-to-br from-orange-400 to-orange-500 rounded-full opacity-20"></div>
-        <div className="absolute top-32 right-16 w-16 h-16 bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-2xl opacity-30 rotate-45"></div>
-        <div className="absolute bottom-20 left-1/4 w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-500 rounded-full opacity-25"></div>
-        <div className="absolute bottom-32 right-1/3 w-14 h-14 bg-gradient-to-br from-green-400 to-green-500 rounded-2xl opacity-20 rotate-12"></div>
-        <div className="relative z-10">
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight text-gray-900 mb-6">
-            Step into the story as the 
-            <span className="bg-gradient-to-r from-orange-500 to-yellow-400 bg-clip-text text-transparent">hero</span>
+      <section className="relative min-h-screen flex items-center justify-center text-center overflow-hidden bg-[url('/images/cover.png')] bg-cover bg-center bg-no-repeat">
+        {/* Dark overlay for better text readability */}
+        <div className="absolute inset-0 opacity-30" style={{backgroundColor: 'rgba(0,0,0,0.3)'}}></div>
+        
+        <div className="relative z-10 px-6 sm:px-10 md:px-16 py-20 sm:py-28">
+          <h1 className="text-5xl sm:text-6xl md:text-7xl font-extrabold tracking-tight mb-6 drop-shadow-2xl">
+            <span className="text-white">Stories </span>
+            <span className="bg-gradient-to-r from-yellow-300 via-pink-300 to-purple-400 bg-clip-text text-transparent">Alive!</span>
           </h1>
-          <p className="mt-5 text-lg text-gray-700 max-w-2xl mx-auto leading-relaxed">
-            Capture your face once and see yourself as the main character in an interactive story.
-            Private by default. Works on any modern device.
+          <p className="mt-5 text-xl sm:text-2xl text-white max-w-3xl mx-auto leading-relaxed drop-shadow-lg font-semibold">
+            Talk, Move & Be The Main Character
           </p>
+          <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Link
+              href="/play/character"
+              className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white px-8 py-4 rounded-full text-lg font-semibold transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl"
+            >
+              🚀 Get started
+            </Link>
+            <a
+              href="#how-it-works"
+              className="bg-white bg-opacity-90 hover:bg-opacity-100 text-gray-900 px-8 py-4 rounded-full text-lg font-semibold transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl"
+            >
+              ✨ See how it works
+            </a>
+          </div>
         </div>
-        <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4 relative z-10">
-          <Link
-            href="/play/character"
-            className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white px-8 py-4 rounded-full text-lg font-semibold transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl"
+        
+        {/* Scroll Indicator */}
+        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce">
+          <svg 
+            className="w-8 h-8 text-white drop-shadow-lg" 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24" 
+            xmlns="http://www.w3.org/2000/svg"
           >
-            🚀 Get started
-          </Link>
-          <a
-            href="#how-it-works"
-            className="bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-gray-900 px-8 py-4 rounded-full text-lg font-semibold transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl"
-          >
-            ✨ See how it works
-          </a>
+            <path 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              strokeWidth={2} 
+              d="M19 14l-7 7m0 0l-7-7m7 7V3"
+            />
+          </svg>
         </div>
       </section>
 
