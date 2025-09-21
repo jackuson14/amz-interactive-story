@@ -30,6 +30,10 @@ const generateStoryAPI = async ({ prompt, systemPrompt, selfie, character }) => 
 };
 
 const parseStoryIntoScenes = (generatedText, images) => {
+  // Defensive defaults
+  const text = typeof generatedText === 'string' ? generatedText : (generatedText?.toString?.() ?? '');
+  const imgs = Array.isArray(images) ? images : [];
+
   // Helpers to extract and clean voice keyword and script text
   const extractKeyword = (content) => {
     if (!content) return null;
@@ -76,7 +80,7 @@ const parseStoryIntoScenes = (generatedText, images) => {
   };
 
   // Parse scene blocks by explicit "Scene N:" headers to preserve per-scene mapping
-  const sceneBlocks = generatedText.match(/(^|\n)Scene\s+\d+:[\s\S]*?(?=(?:\nScene\s+\d+:)|$)/gi) || [];
+  const sceneBlocks = text.match(/(^|\n)Scene\s+\d+:[\s\S]*?(?=(?:\nScene\s+\d+:)|$)/gi) || [];
 
   // Create scenes in the format expected by the story page
   const scenes = [];
@@ -132,12 +136,12 @@ const parseStoryIntoScenes = (generatedText, images) => {
         keyword,
         instruction,
         bg: backgroundColors[index % backgroundColors.length],
-        image: images[index] ? `data:${images[index].mimeType};base64,${images[index].data}` : null
+        image: imgs[index] ? `data:${imgs[index].mimeType};base64,${imgs[index].data}` : null
       });
     });
   } else {
     // Fallback: create 6 scenes from the full text
-    const fullText = generatedText.trim();
+    const fullText = text.trim();
     const sentences = fullText.split(/[.!?]+/).filter(s => s.trim());
     const sentencesPerScene = Math.max(1, Math.floor(sentences.length / 6));
 
@@ -153,7 +157,7 @@ const parseStoryIntoScenes = (generatedText, images) => {
         // Last scene: no voice keyword (will use jump interaction instead)
         keyword: i === 5 ? null : 'next',
         bg: backgroundColors[i % backgroundColors.length],
-        image: images[i] ? `data:${images[i].mimeType};base64,${images[i].data}` : null
+        image: imgs[i] ? `data:${imgs[i].mimeType};base64,${imgs[i].data}` : null
       });
     }
   }
