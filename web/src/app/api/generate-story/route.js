@@ -251,25 +251,21 @@ export async function POST(request) {
       }
     }
 
-    // Attach streamed images to scenes by index to produce scene.image data URLs
-    if (Array.isArray(results.scenes) && results.scenes.length > 0) {
-      try {
-        const imgs = Array.isArray(results.images) ? results.images : [];
-        results.scenes = results.scenes.map((scene, i) => {
-          const img = imgs[i];
-          const imageUrl = img ? `data:${img.mimeType};base64,${img.data}` : (scene.image || null);
-          return { ...scene, image: imageUrl };
-        });
-      } catch (e) {
-        console.warn('Failed to attach images to scenes:', e);
-      }
-    }
+    // Images are already attached to scenes in the generation loop above
+    // No need to reprocess them here
 
     // Build minimal response without top-level images/textContent per request
     const minimalResult = {
       status: results.status,
       scenes: results.scenes || []
     };
+
+    // Log image status for debugging
+    console.log('Sending response with scenes:', minimalResult.scenes.map((s, i) => ({
+      scene: i + 1,
+      hasImage: !!s.image,
+      imageLength: s.image ? s.image.length : 0
+    })));
 
     return NextResponse.json({
       status: "success",
