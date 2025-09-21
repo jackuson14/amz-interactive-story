@@ -137,8 +137,14 @@ export const useTTS = (options = {}) => {
       });
 
       audio.addEventListener('error', (e) => {
-        console.error('Audio playback error:', e);
-        setError('Audio playback failed');
+        // Only log meaningful audio errors, not empty objects
+        if (e.target && e.target.error) {
+          console.error('Audio playback error:', e.target.error);
+          setError(`Audio error: ${e.target.error.message || 'Playback failed'}`);
+        } else {
+          console.warn('Audio error (no details available)');
+          // Don't show generic error to user as it's usually not actionable
+        }
         setIsPlaying(false);
         setIsPaused(false);
       });
