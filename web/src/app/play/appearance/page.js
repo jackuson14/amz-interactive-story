@@ -195,6 +195,8 @@ export default function PlayAppearancePage() {
     const payload = { url: dataUrl, w, h };
     setSelfie(payload);
     try { localStorage.setItem(SELFIE_KEY, JSON.stringify(payload)); } catch {}
+    // Stop the camera after capturing the photo
+    stopCamera();
   };
 
   const clearSelfie = () => {
@@ -235,43 +237,86 @@ export default function PlayAppearancePage() {
   const canProceed = (characterType === "selfie" && !!selfie) || (characterType === "preset" && !!selectedPresetCharacter);
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-orange-50 via-yellow-50 to-green-50">
-      <section className="px-6 sm:px-10 md:px-16 py-10 border-b bg-gradient-to-r from-orange-400 to-yellow-400">
-        <h1 className="text-4xl font-bold text-white mb-2">Create Your Look!</h1>
-        <p className="text-orange-100 text-lg">Step 2 of 3: Create your character appearance, {characterName}!</p>
-        <div className="mt-6">
-          <Link href="/play/character" className="bg-white/20 hover:bg-white/30 text-white px-6 py-3 rounded-full font-medium transition-colors backdrop-blur-sm border border-white/20">← Back to Step 1</Link>
-        </div>
-      </section>
-
-      <section className="px-6 sm:px-10 md:px-16 py-8">
-        <div className="mx-auto max-w-6xl">
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-white/50 shadow-xl p-6 sm:p-8">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-r from-orange-500 to-yellow-500 text-white grid place-items-center font-bold text-lg">2</div>
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">Your Appearance</h2>
-                <p className="text-gray-600">How do you want to appear in your story?</p>
+    <main className="min-h-screen">
+      <section>
+        <div className="mx-auto max-w-full">
+          <div className="grid grid-cols-1 lg:grid-cols-2">
+            {/* Left side - Title */}
+            <div className="px-6 sm:px-12 md:px-16 lg:px-32 py-10 lg:py-20 lg:min-h-screen flex flex-col" style={{backgroundColor: '#3b2986'}}>
+              <Link href="/play/character" className="inline-flex items-center text-white hover:text-gray-200 transition-all hover:scale-105 mb-4 lg:mb-8">
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" />
+                </svg>
+              </Link>
+              <div className="mb-4 lg:mb-8">
+                <div className="text-white text-base font-bold mb-2 lg:mb-4">
+                  Step 2 of 3
+                </div>
+                <h1 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-extrabold text-white mb-4 lg:mb-8">Create Your Look!</h1>
               </div>
+              
+              {/* Selected Character Display - Moved to left panel */}
+              {characterType === "preset" && selectedPresetCharacter && (
+                <div className="hidden lg:flex mb-8 flex-col items-center">
+                  <p className="text-3xl font-bold text-white mb-4 text-center">{characterName || "Your Name"}</p>
+                  <div className="w-[25rem] h-[25rem] max-w-full">
+                    <Image
+                      src={(() => {
+                        // Convert path from thumbnail to full body image
+                        // e.g., /images/3-4yo/Female-Artboard 1.jpg -> /images/3-4yo/Female-Artboard1_full.png
+                        const basePath = selectedPresetCharacter.path;
+                        const pathParts = basePath.split('/');
+                        const filename = pathParts[pathParts.length - 1];
+                        const folderPath = pathParts.slice(0, -1).join('/');
+                        
+                        // Extract the artboard number and gender
+                        const match = filename.match(/(Female|Male)-Artboard (\d+)/);
+                        if (match) {
+                          const [, gender, number] = match;
+                          return `${folderPath}/${gender}-Artboard${number}_full.png`;
+                        }
+                        return basePath; // Fallback to original if pattern doesn't match
+                      })()}
+                      alt={selectedPresetCharacter.name}
+                      width={400}
+                      height={400}
+                      className="w-full h-full object-contain"
+                      unoptimized
+                    />
+                  </div>
+                </div>
+              )}
+              
+              <div className="flex-grow"></div>
+            </div>
+            
+            {/* Right side - Form fields */}
+            <div className="bg-white px-6 sm:px-12 md:px-16 lg:px-32 py-10 lg:py-20 lg:min-h-screen">
+              <div className="space-y-6 lg:space-y-8 lg:mt-20">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-gray-700">Your Appearance</h2>
+              <p className="text-gray-600">How do you want to appear in your story?</p>
             </div>
 
             {/* Character Type Selection */}
             <div className="mb-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <button
-                  onClick={() => setCharacterType("selfie")}
+                  onClick={async () => {
+                    setCharacterType("selfie");
+                    // Request camera permission when selecting selfie mode
+                    if (!cameraOn && !selfie) {
+                      await startCamera();
+                    }
+                  }}
                   className={`p-8 rounded-2xl border-3 text-left transition-all duration-200 transform hover:scale-105 ${
                     characterType === "selfie"
                       ? "border-orange-400 bg-gradient-to-br from-orange-50 to-yellow-50 shadow-lg"
                       : "border-gray-200 bg-white hover:border-orange-200 shadow-md hover:shadow-lg"
                   }`}
                 >
-                  <div className="text-5xl mb-4">📸</div>
-                  <h3 className="text-xl font-bold mb-3 text-gray-900">Use My Photo</h3>
+                  <h3 className="text-xl font-bold mb-3 text-gray-900">📸 Use My Photo</h3>
                   <p className="text-gray-700">Take a selfie to appear as yourself in the story!</p>
-                  {characterType === "selfie" && (
-                    <div className="mt-3 text-orange-600 font-medium text-sm">✓ Selected!</div>
-                  )}
                 </button>
                 <button
                   onClick={() => setCharacterType("preset")}
@@ -281,127 +326,112 @@ export default function PlayAppearancePage() {
                       : "border-gray-200 bg-white hover:border-green-200 shadow-md hover:shadow-lg"
                   }`}
                 >
-                  <div className="text-5xl mb-4">🎭</div>
-                  <h3 className="text-xl font-bold mb-3 text-gray-900">Choose Character</h3>
+                  <h3 className="text-xl font-bold mb-3 text-gray-900">🎭 Choose Character</h3>
                   <p className="text-gray-700">Pick from our collection of fun characters!</p>
-                  {characterType === "preset" && (
-                    <div className="mt-3 text-green-600 font-medium text-sm">✓ Selected!</div>
-                  )}
                 </button>
               </div>
             </div>
 
             {/* Selfie Interface */}
             {characterType === "selfie" && (
-              <div className="bg-gradient-to-br from-orange-50 to-yellow-50 rounded-2xl p-6 border border-orange-200">
-                <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-                  <span className="text-orange-500">📷</span> Camera
-                </h3>
-                
+              <div className="space-y-6">
                 {cameraError && (
                   <div className="mb-4 rounded border border-red-200 bg-red-50 text-red-700 p-3 text-sm">{cameraError}</div>
                 )}
 
-                <div className="flex flex-wrap items-start gap-6">
-                  <div className="flex flex-col gap-3">
-                    {!cameraOn ? (
-                      <button onClick={startCamera} className="bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-600 hover:to-yellow-600 text-white px-8 py-4 rounded-full font-bold text-lg transition-all transform hover:scale-105 shadow-lg">
-                        🎬 Start Camera
-                      </button>
-                    ) : (
-                      <div className="flex flex-col gap-4">
-                        <button onClick={captureFrame} className="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white px-8 py-4 rounded-full font-bold transition-all transform hover:scale-105 shadow-lg">
-                          📸 Capture Photo
-                        </button>
-                        <button onClick={stopCamera} className="border-2 border-orange-300 text-orange-600 hover:bg-orange-50 px-6 py-3 rounded-full font-medium transition-colors">
-                          Stop Camera
-                        </button>
-                      </div>
-                    )}
-
+                <div className="flex items-start gap-6">
+                  {/* Camera View */}
+                  <div className={`flex flex-col gap-3 ${cameraOn ? '' : 'hidden'}`}>
                     <video
                       ref={videoRef}
                       autoPlay
                       playsInline
                       muted
-                      className={`mt-2 rounded border bg-black w-full max-w-sm ${cameraOn ? "block" : "hidden"}`}
-                      style={{ width: "100%", height: "auto" }}
+                      className="rounded-lg border bg-black w-80 h-60"
                     />
                     <canvas ref={canvasRef} className="hidden" />
                     {cameraOn && (
-                      <p className="mt-2 text-xs text-gray-500">Tip: Smile and center your face in the frame!</p>
+                      <>
+                        <div className="flex gap-3">
+                          <button onClick={captureFrame} className="flex-1 rounded-2xl bg-gradient-to-r from-green-400 to-emerald-400 text-white px-6 py-3 text-lg font-bold transition-all duration-200 transform hover:scale-105 hover:shadow-xl shadow-lg">
+                            ✨ Capture
+                          </button>
+                          <button onClick={stopCamera} className="rounded-2xl border-2 border-gray-300 bg-white text-gray-700 px-4 py-3 text-base font-medium transition-all duration-200 hover:border-gray-400 hover:bg-gray-50">
+                            Stop
+                          </button>
+                        </div>
+                        <p className="text-xs text-gray-500 text-center">Smile and center your face in the frame!</p>
+                      </>
                     )}
                   </div>
 
-                  <div>
-                    <h4 className="font-medium mb-2 text-gray-900">Your Photo</h4>
-                    <div className="mt-2">
+                  {/* Your Photo Section */}
+                  <div className="flex-1">
+                    <h4 className="text-xl font-bold mb-4 text-gray-900">Your Photo</h4>
+                    <div className="flex items-start gap-4">
                       {selfie ? (
-                        <Image 
-                          src={selfie.url} 
-                          alt="your photo" 
-                          width={selfie.w || 256} 
-                          height={selfie.h || 256} 
-                          className="w-64 h-auto rounded border" 
-                        />
+                        <>
+                          <Image 
+                            src={selfie.url} 
+                            alt="your photo" 
+                            width={selfie.w || 256} 
+                            height={selfie.h || 256} 
+                            className="w-64 h-auto rounded-lg border shadow-md" 
+                          />
+                          <button onClick={() => {
+                            clearSelfie();
+                            startCamera();
+                          }} className="rounded-2xl border-2 border-gray-300 bg-white px-6 py-3 text-base text-gray-700 font-medium transition-all duration-200 hover:border-gray-400 hover:bg-gray-50">
+                            🔄 Retake Photo
+                          </button>
+                        </>
                       ) : (
-                        <div className="w-64 h-40 border rounded flex items-center justify-center text-gray-400">
-                          No photo yet
+                        <div className="w-64 h-48 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center text-gray-400">
+                          <p className="text-lg mb-2">No photo yet</p>
+                          {!cameraOn && (
+                            <button onClick={startCamera} className="rounded-2xl bg-gradient-to-r from-amber-400 to-yellow-400 text-gray-900 px-6 py-3 text-base font-bold transition-all duration-200 transform hover:scale-105 hover:shadow-lg">
+                              📸 Start Camera
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
-                    {selfie && (
-                      <div className="mt-4">
-                        <button onClick={clearSelfie} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                          Retake Photo
-                        </button>
-                      </div>
-                    )}
                   </div>
-
                 </div>
               </div>
             )}
 
             {/* Preset Character Interface */}
             {characterType === "preset" && (
-              <div className="bg-gradient-to-br from-green-50 to-blue-50 rounded-2xl p-6 border border-green-200">
-                <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-                  <span className="text-green-500">🌟</span> Choose Your Character
-                </h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-8">
-                  {getAvailableCharacterImages(characterAge, characterGender).map((characterImg) => (
+              <div className="space-y-6">
+                {/* Character Selection Grid */}
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {getAvailableCharacterImages(characterAge, characterGender).map((characterImg, index) => (
                     <div
                       key={characterImg.id}
                       onClick={() => setSelectedPresetCharacter(characterImg)}
-                      className={`aspect-square rounded-2xl border-3 cursor-pointer transition-all transform hover:scale-105 hover:shadow-xl bg-gradient-to-br from-blue-50 to-purple-50 ${
+                      className={`relative aspect-square rounded-2xl border-3 cursor-pointer transition-all duration-200 transform hover:scale-105 hover:shadow-xl overflow-hidden ${
                         selectedPresetCharacter?.id === characterImg.id
-                          ? "border-orange-500 ring-4 ring-orange-300 shadow-2xl scale-105"
-                          : "border-white/50 hover:border-orange-300"
+                          ? "border-purple-500 ring-4 ring-purple-200 shadow-xl"
+                          : "border-gray-200 hover:border-purple-300 shadow-md bg-white"
                       }`}
                     >
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Image
-                          src={characterImg.path}
-                          alt={characterImg.name}
-                          width={200}
-                          height={200}
-                          className="rounded-lg object-cover w-full h-full"
-                          unoptimized
-                        />
-                      </div>
+                      <Image
+                        src={characterImg.path}
+                        alt={characterImg.name}
+                        width={200}
+                        height={200}
+                        className="w-full h-full object-cover"
+                        unoptimized
+                      />
+                      {selectedPresetCharacter?.id === characterImg.id && (
+                        <div className="absolute top-2 right-2 w-8 h-8 bg-purple-500 text-white rounded-full flex items-center justify-center font-bold shadow-lg">
+                          ✓
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
-                
-                {selectedPresetCharacter && (
-                  <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
-                    <p className="text-sm text-indigo-800">
-                      <strong>{selectedPresetCharacter.name}</strong> selected! ✨
-                    </p>
-                    <p className="text-xs text-indigo-600 mt-1">Perfect choice for your story adventure!</p>
-                  </div>
-                )}
               </div>
             )}
 
@@ -410,30 +440,28 @@ export default function PlayAppearancePage() {
               {characterType === "selfie" && selfie && (
                 <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                   <p className="text-blue-800 font-medium">
-                    ✅ You can continue now, or generate a character for a cartoon version of you.
+                    Your personalized character will be generated as part of your story!
                   </p>
                   <p className="text-blue-700 text-sm mt-1">
-                    Tip: Generating a character makes your stories more personalized, but it’s optional.
+                    We'll create a cartoon version of you that appears in each story scene.
                   </p>
                 </div>
               )}
 
               <Link
                 href="/play/idea"
-                className={`inline-flex items-center gap-3 px-10 py-5 rounded-full font-bold text-lg transition-all transform hover:scale-105 shadow-lg ${
-                  canProceed 
-                    ? "bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white" 
-                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                className={`w-full text-center rounded-full py-6 px-10 text-2xl font-bold transition-all duration-200 block transform ${
+                  canProceed
+                    ? "bg-gradient-to-r from-amber-400 to-yellow-400 text-gray-900 hover:shadow-xl hover:scale-105 shadow-lg"
+                    : "bg-gray-200 text-gray-400 cursor-not-allowed"
                 }`}
                 aria-disabled={!canProceed}
                 onClick={(e) => { if (!canProceed) e.preventDefault(); }}
               >
-                <span>Next: Choose Story</span>
-                <span className="text-2xl">🎯</span>
+                {canProceed ? "Let's Choose a Story! →" : "Take a photo or choose a character!"}
               </Link>
-              <p className="text-sm text-gray-500 mt-3">
-                Step 2 of 3 {canProceed && <span className="text-green-600">✓ Complete</span>}
-              </p>
+            </div>
+              </div>
             </div>
           </div>
         </div>

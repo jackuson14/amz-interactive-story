@@ -44,20 +44,20 @@ export default function PlayCharacterPage() {
         <div className="mx-auto max-w-full">
           <div className="grid grid-cols-1 lg:grid-cols-2">
             {/* Left side - Title */}
-            <div className="px-12 sm:px-16 md:px-32 py-20 min-h-screen flex flex-col" style={{backgroundColor: '#8f94c4'}}>
-              <Link href="/" className="inline-flex items-center text-white hover:text-gray-200 transition-all hover:scale-105 mb-8">
+            <div className="px-6 sm:px-12 md:px-16 lg:px-32 py-10 lg:py-20 lg:min-h-screen flex flex-col" style={{backgroundColor: '#8f94c4'}}>
+              <Link href="/" className="inline-flex items-center text-white hover:text-gray-200 transition-all hover:scale-105 mb-4 lg:mb-8">
                 <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" />
                 </svg>
               </Link>
-              <div className="mb-8">
-                <div className="text-white text-base font-bold mb-4">
+              <div className="mb-4 lg:mb-8">
+                <div className="text-white text-base font-bold mb-2 lg:mb-4">
                   Step 1 of 3
                 </div>
-                <h1 className="text-5xl lg:text-6xl font-extrabold text-white">Tell us about yourself!</h1>
-                <p className="text-xl text-white mb-8">Let's create your amazing character for the story adventure!</p>
+                <h1 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-extrabold text-white">Tell us about yourself!</h1>
+                <p className="text-lg lg:text-xl text-white mt-2 lg:mb-8">Let's create your amazing character for the story adventure!</p>
               </div>
-              <div className="flex-grow flex items-end">
+              <div className="hidden lg:flex flex-grow items-end">
                 <Image 
                   src="/images/step1.png" 
                   alt="Character creation illustration" 
@@ -70,8 +70,8 @@ export default function PlayCharacterPage() {
             </div>
             
             {/* Right side - Form fields */}
-            <div className="bg-white px-12 sm:px-16 md:px-32 py-20 min-h-screen">
-              <div className="space-y-8 mt-20">
+            <div className="bg-white px-6 sm:px-12 md:px-16 lg:px-32 py-10 lg:py-20 lg:min-h-screen">
+              <div className="space-y-6 lg:space-y-8 lg:mt-20">
               <div>
                 <label htmlFor="character-name" className="block text-2xl font-bold text-gray-700 mb-4">
                   What&apos;s your name?
