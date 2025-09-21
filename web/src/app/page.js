@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 
 export default function Home() {
   return (
@@ -9,6 +10,18 @@ export default function Home() {
         <div className="absolute inset-0 opacity-30" style={{backgroundColor: 'rgba(0,0,0,0.3)'}}></div>
         
         <div className="relative z-10 px-6 sm:px-10 md:px-16 py-20 sm:py-28">
+          {/* PollyStory Logo */}
+          <div className="mb-8 flex justify-center">
+            <Image
+              src="/images/PollyStory_logo.png"
+              alt="PollyStory"
+              width={200}
+              height={100}
+              className="drop-shadow-2xl"
+              unoptimized
+            />
+          </div>
+          
           <h1 className="text-5xl sm:text-6xl md:text-7xl font-extrabold tracking-tight mb-6 drop-shadow-2xl">
             <span className="text-white">Stories </span>
             <span className="bg-gradient-to-r from-amber-400 to-yellow-400 bg-clip-text text-transparent">Alive!</span>
