@@ -100,9 +100,7 @@ export default function PlayAppearancePage() {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
 
-  // Character generation state
-  const [generatedCharacter, setGeneratedCharacter] = useState(null);
-  const [isGenerating, setIsGenerating] = useState(false);
+  // Removed character generation state - no longer needed
 
   // Load existing data from storage
   useEffect(() => {
@@ -201,37 +199,10 @@ export default function PlayAppearancePage() {
 
   const clearSelfie = () => {
     setSelfie(null);
-    setGeneratedCharacter(null);
     try { localStorage.removeItem(SELFIE_KEY); } catch {}
   };
 
-  // Generate cartoon character from selfie (dummy implementation)
-  const generateCharacter = async () => {
-    if (!selfie) return;
-    
-    setIsGenerating(true);
-    
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Dummy character generation - in real implementation, this would call an AI service
-    const dummyCharacters = [
-      "/stories/zoo/char/boy1.png",
-      "/stories/zoo/char/boy2.png",
-      // Add more dummy character options here
-    ];
-    
-    const randomCharacter = dummyCharacters[Math.floor(Math.random() * dummyCharacters.length)];
-    
-    const generatedChar = {
-      url: randomCharacter,
-      originalPhoto: selfie.url,
-      generated: true
-    };
-    
-    setGeneratedCharacter(generatedChar);
-    setIsGenerating(false);
-  };
+  // Removed generateCharacter function - no longer needed
 
   useEffect(() => {
     return () => {
@@ -379,34 +350,10 @@ export default function PlayAppearancePage() {
                         </div>
                       )}
                     </div>
-                    {selfie && !generatedCharacter && (
-                      <div className="mt-4 space-y-2">
-                        <button 
-                          onClick={generateCharacter}
-                          disabled={isGenerating}
-                          className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-6 py-3 rounded-full font-bold transition-all transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {isGenerating ? (
-                            <span className="flex items-center justify-center gap-2">
-                              <span className="animate-spin">🎨</span>
-                              Generating Character...
-                            </span>
-                          ) : (
-                            <span className="flex items-center justify-center gap-2">
-                              <span>✨</span>
-                              Generate Character
-                            </span>
-                          )}
-                        </button>
-                        <button onClick={clearSelfie} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                          Retake Photo
-                        </button>
-                      </div>
-                    )}
-                    {generatedCharacter && (
+                    {selfie && (
                       <div className="mt-4">
                         <button onClick={clearSelfie} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                          Start Over
+                          Retake Photo
                         </button>
                       </div>
                     )}
