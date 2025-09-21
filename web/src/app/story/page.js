@@ -849,8 +849,8 @@ export default function StoryPage() {
 
   return (
     <main className="min-h-screen bg-white">
-      {/* Start Story Button Overlay */}
-      {showStartButton && (
+      {/* Start Story Button Overlay - only show for non-AI stories */}
+      {showStartButton && !aiLoading && !(hasCompletedFlow && prompt && !customScenes) && current && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
           <div className="bg-white rounded-xl shadow-2xl p-8 max-w-md mx-4 text-center">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">🎬 Ready for Your Story?</h2>
@@ -883,19 +883,126 @@ export default function StoryPage() {
       {/* Scene viewport */}
       {!current ? (
         // Loading state when current scene is not yet available
-        <section className="px-6 sm:px-10 md:px-16 py-8">
-          <div className="mx-auto max-w-5xl">
-            {/* Loading skeletons while generating AI story */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-pulse">
-              <div className="h-[260px] md:h-[360px] rounded-xl bg-gray-200" />
-              <div className="space-y-4">
-                <div className="h-8 w-2/3 bg-gray-200 rounded" />
-                <div className="h-4 w-full bg-gray-200 rounded" />
-                <div className="h-4 w-11/12 bg-gray-200 rounded" />
-                <div className="h-4 w-10/12 bg-gray-200 rounded" />
-                <div className="h-10 w-1/2 bg-gray-200 rounded mt-6" />
-              </div>
-            </div>
+        <section className="min-h-screen bg-gradient-to-br from-purple-100 via-blue-100 to-indigo-200 flex items-center justify-center px-6">
+          <div className="text-center">
+            {/* Check if we're generating an AI story based on prompt */}
+            {(aiLoading || (hasCompletedFlow && prompt && !customScenes)) ? (
+              <>
+                {/* AI Story Generation Loading */}
+                <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl p-10 max-w-2xl mx-auto">
+                  {/* Animated stars */}
+                  <div className="flex justify-center mb-6">
+                    <div className="relative">
+                      <div className="text-6xl animate-bounce">✨</div>
+                      <div className="absolute -left-8 top-0 text-4xl animate-pulse delay-100">🌟</div>
+                      <div className="absolute -right-8 top-0 text-4xl animate-pulse delay-200">⭐</div>
+                    </div>
+                  </div>
+                  
+                  <h2 className="text-3xl font-bold text-purple-800 mb-4">
+                    {customScenes ? "Your Story is Ready!" : "Creating Your Magical Story..."}
+                  </h2>
+                  
+                  <p className="text-lg text-gray-700 mb-6">
+                    {customScenes 
+                      ? "Your personalized adventure awaits! Click the button below to begin."
+                      : "Our AI storyteller is crafting a personalized adventure just for you!"}
+                  </p>
+                  
+                  {/* Loading animation - only show when still loading */}
+                  {!customScenes && (
+                    <div className="flex justify-center mb-6">
+                      <div className="flex space-x-2">
+                        <div className="w-4 h-4 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                        <div className="w-4 h-4 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                        <div className="w-4 h-4 bg-pink-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Progress steps */}
+                  <div className="space-y-3 text-left max-w-md mx-auto mb-6">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                        <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <span className="text-gray-600">Reading your story idea</span>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-6 h-6 ${customScenes ? 'bg-green-500' : 'bg-purple-500'} rounded-full ${!customScenes ? 'animate-pulse' : ''} flex items-center justify-center`}>
+                        {customScenes && (
+                          <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        )}
+                      </div>
+                      <span className={customScenes ? "text-gray-600" : "text-gray-800 font-semibold"}>
+                        {customScenes ? "Story scenes generated" : "Generating story scenes..."}
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-6 h-6 ${customScenes ? 'bg-green-500' : 'bg-gray-300'} rounded-full flex items-center justify-center`}>
+                        {customScenes && (
+                          <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        )}
+                      </div>
+                      <span className={customScenes ? "text-gray-600" : "text-gray-400"}>
+                        {customScenes ? "Illustrations ready" : "Preparing illustrations"}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {/* Start Story Button */}
+                  <div className="mt-6">
+                    <button
+                      onClick={handleStartStory}
+                      disabled={!customScenes}
+                      className={`
+                        ${customScenes 
+                          ? 'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 transform hover:scale-105 animate-pulse' 
+                          : 'bg-gray-300 cursor-not-allowed opacity-50'}
+                        text-white font-bold py-4 px-8 rounded-xl text-lg transition-all shadow-lg w-full
+                      `}
+                    >
+                      {customScenes ? '🌟 Start Story 🌟' : '⏳ Please wait...'}
+                    </button>
+                    <p className="text-xs text-gray-500 mt-3">
+                      {customScenes ? 'Click to begin your magical adventure with voice narration' : 'Your story is being created'}
+                    </p>
+                  </div>
+                  
+                  {/* Fun facts while waiting */}
+                  {!customScenes && (
+                    <div className="mt-6 p-4 bg-purple-50 rounded-lg">
+                      <p className="text-sm text-purple-700 italic">
+                        💡 Did you know? Every story is unique and created just for you!
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Generic loading for non-AI stories */}
+                <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl p-10 max-w-lg mx-auto">
+                  <div className="text-5xl mb-4 animate-pulse">📚</div>
+                  <h2 className="text-2xl font-bold text-gray-800 mb-4">
+                    Loading Story...
+                  </h2>
+                  <div className="flex justify-center">
+                    <div className="flex space-x-2">
+                      <div className="w-3 h-3 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                      <div className="w-3 h-3 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                      <div className="w-3 h-3 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </section>
       ) : current.bg && current.bg.startsWith('/') ? (
