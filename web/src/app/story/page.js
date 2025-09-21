@@ -52,17 +52,17 @@ export default function StoryPage() {
         jumpDetectionActive,
         currentPage: idx
       });
-      
-      if (speechSupported && !isListening && !jumpDetectionActive && hasUserInteracted) {
+
+      if (speechSupported && !isListening && !jumpDetectionActive && hasUserInteracted && voiceNavEnabled) {
         console.log('✅ Starting voice recognition after TTS ended');
         setTimeout(() => {
           startListening();
         }, 1000); // Small delay to ensure TTS cleanup is complete
       } else {
         console.log('❌ Not starting voice recognition:', {
-          reason: !speechSupported ? 'speech not supported' : 
-                  isListening ? 'already listening' : 
-                  jumpDetectionActive ? 'movement page active' : 
+          reason: !speechSupported ? 'speech not supported' :
+                  isListening ? 'already listening' :
+                  jumpDetectionActive ? 'movement page active' :
                   !hasUserInteracted ? 'user has not interacted yet' : 'unknown'
         });
       }
@@ -87,7 +87,7 @@ export default function StoryPage() {
     onFinalTranscript: (result) => {
       const transcript = result.transcript || '';
       const lowerTranscript = transcript.toLowerCase().trim();
-      const expectedKeyword = getPageSpeechKeyword(current?.text);
+      const expectedKeyword = getExpectedKeyword();
 
       console.log('\ud83c\udfa4 Transcribe final result:', {
         transcript,
@@ -132,6 +132,12 @@ export default function StoryPage() {
           return;
         }
       }
+
+        // Provide gentle guidance when keyword not recognized
+        if (expectedKeyword && lowerTranscript) {
+          setVoiceError(`Heard "${lowerTranscript}" — try saying "${expectedKeyword}"`);
+        }
+
     },
     onError: (error) => {
       const msg = error?.message || '';
@@ -151,7 +157,9 @@ export default function StoryPage() {
   // User interaction state for autoplay policy compliance
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
   const [showStartButton, setShowStartButton] = useState(true);
-  
+
+  const [voiceNavEnabled, setVoiceNavEnabled] = useState(true);
+
   // Navigation debouncing to prevent page skipping
   const navigationInProgress = useRef(false);
   const lastNavigationTime = useRef(0);
@@ -176,6 +184,17 @@ export default function StoryPage() {
     console.log('❌ No keyword pattern found');
     return null;
   }, []);
+
+
+  // Prefer explicit scene keyword when available; fallback to parsing text
+  const getExpectedKeyword = useCallback(() => {
+    // Do not use voice keywords on the last scene; last scene uses jump interaction
+    if (idx === scenes.length - 1) return null;
+    if (current?.keyword) {
+      return String(current.keyword).toLowerCase();
+    }
+    return getPageSpeechKeyword(current?.text);
+  }, [current, getPageSpeechKeyword, idx, scenes.length]);
 
   // AI Story Generator
   const { generateAIStory, loading: aiLoading, error: aiError, setError: setAiError } = AIStoryGenerator({
@@ -286,7 +305,7 @@ export default function StoryPage() {
       if (!storyId) {
         return [];
       }
-      
+
       const f = SAMPLE_STORIES.find((s) => s.id === storyId);
       if (f) {
         // If it's a markdown story and we have parsed content, use that
@@ -394,7 +413,7 @@ export default function StoryPage() {
       navigationInProgress.current = false;
     }, 1500);
   }, [scenes.length, idx]);
-  
+
   const prev = useCallback(() => {
     setIdx((v) => Math.max(v - 1, 0));
   }, []);
@@ -412,12 +431,10 @@ export default function StoryPage() {
   }, [transcribe]);
 
 
-  // Activate jump detection on jungle scene (page 3, idx 2) for goodnight-zoo story
+  // Activate jump detection ONLY on the last scene for goodnight-zoo story
   useEffect(() => {
-    const shouldActivateJumpDetection =
-      storyId === "goodnight-zoo" &&
-      idx === 2 &&
-      scenes.length > 0;
+    const isLastScene = idx === scenes.length - 1 && scenes.length > 0;
+    const shouldActivateJumpDetection = storyId === "goodnight-zoo" && isLastScene;
 
     console.log('Jump detection check:', { storyId, idx, scenes: scenes.length, shouldActivate: shouldActivateJumpDetection });
 
@@ -432,9 +449,14 @@ export default function StoryPage() {
 
   // Handle jump detection
   const handleJumpDetected = useCallback(() => {
-    console.log('Jump detected! Moving to next scene...');
-    next();
-  }, [next]);
+    console.log('Jump detected!');
+    const isLastScene = idx === scenes.length - 1;
+    if (isLastScene) {
+      setShowTheEnd(true);
+    } else {
+      next();
+    }
+  }, [idx, scenes.length, next]);
 
 
   // Cleanup speech recognition when showing "The End" page
@@ -471,6 +493,12 @@ export default function StoryPage() {
       isListening: transcribe.isListening,
       currentPage: idx,
     });
+
+
+    if (!voiceNavEnabled) {
+      setVoiceError('Voice navigation is turned off');
+      return;
+    }
 
     try {
       setVoiceError('');
@@ -600,7 +628,7 @@ export default function StoryPage() {
     console.log('🎬 User started the story - enabling autoplay');
     setHasUserInteracted(true);
     setShowStartButton(false);
-    
+
     // Start playing immediately after user interaction
     if (current) {
       try {
@@ -613,22 +641,22 @@ export default function StoryPage() {
   // Auto-play when scene changes (idx changes) - only after user interaction
   useEffect(() => {
     if (!current || !hasUserInteracted) return;
-    
+
     console.log('Scene changed, stopping current audio and starting new scene');
-    
+
     // Always stop current audio when scene changes
     tts.stop();
-    
+
     // Stop any existing listening when scene changes
     if (isListening) {
       stopListening();
     }
-    
+
     // Small delay to ensure cleanup is complete, then start new audio
     const timer = setTimeout(() => {
       speakCurrent();
     }, 300);
-    
+
     return () => clearTimeout(timer);
   }, [idx, hasUserInteracted]); // Only trigger when scene index changes AND user has interacted
 
@@ -640,7 +668,7 @@ export default function StoryPage() {
       const timer = setTimeout(() => {
         speakCurrent();
       }, 1000);
-      
+
       return () => clearTimeout(timer);
     }
   }, [current, storyId, hasUserInteracted]); // Only trigger when story first loads AND user has interacted
@@ -698,7 +726,7 @@ export default function StoryPage() {
                       Lift both hands up high to unlock another story!
                     </p>
                     <p className="text-sm opacity-90">
-                      Show the camera both your hands raised up like you're cheering!
+                      Show the camera both your hands raised up like you&apos;re cheering!
                     </p>
                   </div>
                   
@@ -847,15 +875,45 @@ export default function StoryPage() {
               <div className="text-white drop-shadow-lg">
                 <p className="text-xl md:text-2xl leading-relaxed mb-4 drop-shadow-lg">{current.text}</p>
 
-                {/* Special jump instruction for jungle scene */}
+
+                {(() => {
+                  const kw = getExpectedKeyword();
+                  return kw ? (
+                    <div className="mb-4 p-4 bg-white/20 backdrop-blur-sm rounded-lg border-2 border-white/40">
+                      <p className="text-white text-lg font-bold text-center drop-shadow-lg">Say &quot;{kw}&quot; to go to the next page</p>
+                    </div>
+                  ) : null;
+                })()}
+
+                {/* Final scene jump instruction */}
                 {jumpDetectionActive && (
                   <div className="mb-4 p-4 bg-green-500/90 backdrop-blur-sm rounded-lg border-2 border-green-300">
                     <p className="text-white text-lg font-bold text-center drop-shadow-lg">
-                      🐒 Jump like a monkey to swing to the next page! 🐒
+                      🎉 Jump to finish the story! 🎉
                     </p>
                     <p className="text-white/90 text-sm text-center mt-1">
-                      Stand back from your camera and jump up and down!
+                      Stand back from your camera so we can see you, then jump!
                     </p>
+
+	                    {/* Voice navigation toggle */}
+	                    <div className="mb-2 flex items-center gap-2">
+	                      <label className="text-sm font-medium text-white drop-shadow-lg">Voice navigation</label>
+	                      <input
+	                        type="checkbox"
+	                        checked={voiceNavEnabled}
+	                        onChange={(e) => {
+	                          setVoiceNavEnabled(e.target.checked);
+	                          if (!e.target.checked && isListening) {
+	                            stopListening();
+	                          }
+	                        }}
+	                        className="rounded"
+	                      />
+	                      {isListening && (
+	                        <span className="ml-2 text-xs text-white/90 drop-shadow-lg">Listening...</span>
+	                      )}
+	                    </div>
+
                   </div>
                 )}
 
@@ -914,7 +972,7 @@ export default function StoryPage() {
                               </p>
                             );
                           }
-                          const expectedKeyword = getPageSpeechKeyword(current?.text);
+                          const expectedKeyword = getExpectedKeyword();
                           if (tts.isPlaying) {
                             return (
                               <p className="text-xs text-orange-600">
@@ -1126,15 +1184,27 @@ export default function StoryPage() {
               <div className="flex flex-col justify-between">
                 <div>
                   <p className="text-lg md:text-xl leading-relaxed text-gray-800">{current.text}</p>
-                  
-                  {/* Special jump instruction for jungle scene */}
+
+                  {(() => {
+                    const kw = getExpectedKeyword();
+                    return kw ? (
+                      <div className="mt-4 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
+                        <p className="text-blue-800 text-lg font-bold text-center">Say &quot;{kw}&quot; to go to the next page</p>
+                      </div>
+                    ) : null;
+                  })()}
+
+
+                  {/* Final scene jump instruction */}
                   {jumpDetectionActive && (
                     <div className="mt-4 p-4 bg-green-100 border-2 border-green-300 rounded-lg">
                       <p className="text-green-800 text-lg font-bold text-center">
-                        🐒 Jump like a monkey to swing to the next page! 🐒
+                        🎉 Jump to finish the story! 🎉
                       </p>
                       <p className="text-green-700 text-sm text-center mt-1">
-                        Stand back from your camera and jump up and down!
+                        Stand back from your camera so we can see you, then jump!
+
+
                       </p>
                     </div>
                   )}
@@ -1163,6 +1233,26 @@ export default function StoryPage() {
                           <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z"/>
                           </svg>
+
+	                    {/* Voice navigation toggle */}
+	                    <div className="mb-2 flex items-center gap-2">
+	                      <label className="text-sm font-medium text-gray-700">Voice navigation</label>
+	                      <input
+	                        type="checkbox"
+	                        checked={voiceNavEnabled}
+	                        onChange={(e) => {
+	                          setVoiceNavEnabled(e.target.checked);
+	                          if (!e.target.checked && isListening) {
+	                            stopListening();
+	                          }
+	                        }}
+	                        className="rounded"
+	                      />
+	                      {isListening && (
+	                        <span className="ml-2 text-xs text-gray-600">Listening...</span>
+	                      )}
+	                    </div>
+
                           Stop Listening
                         </button>
                       )}
@@ -1189,11 +1279,11 @@ export default function StoryPage() {
                           if (!hasUserInteracted) {
                             return (
                               <p className="text-xs text-gray-600">
-                                🎬 Click &quot;Start Story&rdquo; to begin audio and voice commands
+                                🎬 Click &quot;Start Story&quot; to begin audio and voice commands
                               </p>
                             );
                           }
-                          const expectedKeyword = getPageSpeechKeyword(current?.text);
+                          const expectedKeyword = getExpectedKeyword();
                           if (tts.isPlaying) {
                             return (
                               <p className="text-xs text-orange-600">

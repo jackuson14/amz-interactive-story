@@ -30,8 +30,29 @@ const generateStoryAPI = async ({ prompt, systemPrompt, selfie, character }) => 
 };
 
 const parseStoryIntoScenes = (generatedText, images) => {
+  // Helpers to extract and clean voice keyword and script text
+  const extractKeyword = (content) => {
+    if (!content) return null;
+    const keyLine = content.match(/^(?:\s*)(?:Keyword|Voice\s*Keyword)\s*:\s*"?([^"\n]+)"?/im);
+    if (keyLine) return keyLine[1].trim().toLowerCase();
+    const sayMatch = content.match(/Say\s+"([^"]+)"\s+to/i);
+    if (sayMatch) return sayMatch[1].trim().toLowerCase();
+    return null;
+  };
+
+  const cleanSceneText = (content) => {
+    if (!content) return '';
+    return content
+      // remove explicit Keyword or Instruction lines
+      .replace(/^(?:\s*)(?:Keyword|Voice\s*Keyword)\s*:[^\n]*$/gmi, '')
+      .replace(/^(?:\s*)(?:Instruction|Voice\s*Instruction)\s*:[^\n]*$/gmi, '')
+      // remove trailing Say "..." to ... guidance lines
+      .replace(/Say\s+"[^"]+"\s+to[^\n]*$/gmi, '')
+      .trim();
+  };
+
   // Simple parsing - split by common scene indicators
-  const sceneTexts = generatedText.split(/(?:Scene \d+|Chapter \d+|^\d+\.)/im).filter(text => text.trim());
+  const sceneTexts = generatedText.split(/(?:Scene\s+\d+|Chapter\s+\d+|^\d+\.)/im).filter(text => text.trim());
 
   // Create scenes in the format expected by the story page
   const scenes = [];
@@ -49,12 +70,17 @@ const parseStoryIntoScenes = (generatedText, images) => {
     sceneTexts.slice(0, 6).forEach((text, index) => {
       const lines = text.trim().split('\n').filter(line => line.trim());
       const title = lines[0]?.replace(/[*#]/g, '').trim() || `Scene ${index + 1}`;
-      const content = lines.slice(1).join(' ').trim() || text.trim();
+      const rawContent = lines.slice(1).join(' ').trim() || text.trim();
+      // Last scene: no voice keyword (will use jump interaction instead)
+      const extracted = extractKeyword(text) || extractKeyword(rawContent);
+      const keyword = index === 5 ? null : (extracted || 'next');
+      const content = cleanSceneText(rawContent);
 
       scenes.push({
         id: `ai_scene_${index}`,
         title,
         text: content,
+        keyword,
         bg: backgroundColors[index % backgroundColors.length],
         image: images[index] ? `data:${images[index].mimeType};base64,${images[index].data}` : null
       });
@@ -74,6 +100,8 @@ const parseStoryIntoScenes = (generatedText, images) => {
         id: `ai_scene_${i}`,
         title: `Chapter ${i + 1}`,
         text: sceneText,
+        // Last scene: no voice keyword (will use jump interaction instead)
+        keyword: i === 5 ? null : 'next',
         bg: backgroundColors[i % backgroundColors.length],
         image: images[i] ? `data:${images[i].mimeType};base64,${images[i].data}` : null
       });
@@ -139,6 +167,21 @@ const AIStoryGenerator = ({ onStoryGenerated }) => {
     const childAge = character.age || '4-8';
     const childGender = character.gender || 'child';
 
+    // Choose illustration style guidance based on age
+    const parseNumericAge = (val) => {
+      const m = String(val ?? '').match(/\d+/);
+      return m ? parseInt(m[0], 10) : null;
+    };
+    const ageNum = parseNumericAge(childAge);
+    let styleGuidance = `Illustration Style: Use a clean, modern digital storybook style appropriate for children, avoiding photorealism.`;
+    if (ageNum !== null && ageNum <= 4) {
+      styleGuidance = `Illustration Style for Toddlers (Under 4 years)
+A flat vector illustration style for toddlers, emphasizing visual simplicity and emotional safety. Use bold, simple shapes with soft, rounded edges and high contrast. Characters should have large, exaggerated facial features with joyful expressions. The palette is bright and cheerful, using primary and secondary colors with no complex shadows or textures. Backgrounds are minimal, often featuring playful geometric shapes and friendly anthropomorphic elements (e.g., a smiling sun).`;
+    } else if (ageNum === 5 || ageNum === 6) {
+      styleGuidance = `Illustration Style for Young Children (5-6 years)
+A polished and clean vector art style for young children, showing more detail and sophistication. Characters have refined features, nuanced expressions that convey personality, and chibi-influenced proportions. The style incorporates subtle shading, soft gradients for depth, and a more muted, sophisticated color palette (earthy tones, pastels). Clothing and backgrounds are more detailed, featuring patterns and layers. Themes should include diversity and age-appropriate elements like school backpacks.`;
+    }
+
     const systemPrompt = `You are a sophisticated AI Personalized Storyboard Director. Your function is to take a user-provided reference image (including a photograph or selfie), transform it into a consistent storybook character, and generate a sequence of illustrations featuring that character within the scenes of an accompanying story.
 
 Primary Directive: Character Integrity and Consistency
@@ -152,18 +195,26 @@ Personalization:
 - The main character is named ${childName}, a ${childAge} year old ${childGender}.
 - Ensure the story tone and visuals are suitable and delightful for a ${childAge} year old.
 
+Illustration Style Guidance:
+${styleGuidance}
+
 Core Task: Photo-to-Character Transformation
 If a photograph/selfie is provided, first analyze it and creatively transform the person into a charming, expressive illustrated character. Avoid photorealism; adopt a clean, modern digital storybook style unless the story specifies otherwise.
 
-Instructions:
-1) Analyze and Stylize Reference Image (if provided) to establish the official artistic look.
-2) Read the user’s story idea below to understand plot, settings, and actions.
-3) Identify exactly 6 scenes (pages) that tell a complete bedtime story arc.
-   - Scene 3 MUST be an interactive page that explicitly prompts the child to speak a word or short phrase.
-   - Include a clear voice instruction using this exact pattern somewhere on Scene 3: Say "<keyword>" to <action>.
-   - Choose a friendly keyword kids can easily say, e.g., "let's go", "goodnight", or "magic".
-4) For each of the 6 scenes, generate a high-quality, family-friendly illustration featuring the established character placed within the scene.
-5) Also write clear, age-appropriate narrative text for each scene (a short paragraph) that matches the illustration.
+Story Structure Requirements (very important):
+1) Read the user’s story idea below to understand plot, settings, and actions.
+2) Create exactly 6 scenes (pages) that tell a complete bedtime story arc.
+3) For Scenes 1–5, provide ALL of the following lines in order:
+   - Scene N: <Short Title>
+   - Keyword: <a simple kid-friendly word or 1–2 word phrase>
+   - Script: <the complete story text for that page, including any dialogue and narrative>
+   - Instruction: Say "<keyword>" to go to the next page.
+   The keyword must be contextually related to the scene (e.g., "open", "door", "lion", "magic").
+4) Scene 6 is the final celebratory ending page. For Scene 6, output ONLY:
+   - Scene 6: <Short Title>
+   - Script: <the complete story text for that page>
+   Do NOT include a Keyword or an Instruction on Scene 6.
+5) Generate a high-quality, family-friendly illustration for EACH scene that matches the script.
 
 Strict Prohibitions:
 - Do not alter the established stylized appearance of the character once created.
@@ -171,9 +222,18 @@ Strict Prohibitions:
 
 Story idea: ${prompt}
 
-Output format guidance:
-- Start each scene with a label like "Scene 1:" (or "Chapter 1:") followed by the scene title on the next line; then write the paragraph for that scene.
-- Provide narrative text naturally as part of the response and include images as inline data in the multimodal output. The application will parse both text and images.
+Output format guidance (text part):
+For Scenes 1–5 output lines exactly like this order:
+Scene N: Title
+Keyword: word or short phrase
+Script: Full narrative and dialogue for the page
+Instruction: Say "<keyword>" to go to the next page.
+
+For Scene 6 output lines exactly like this order:
+Scene 6: Title
+Script: Full narrative and dialogue for the page
+
+The application will parse the keywords and scripts from these lines. Include images as inline data in the multimodal output.
 `;
 
     return mutation.mutateAsync({

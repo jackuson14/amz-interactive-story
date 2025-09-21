@@ -2,6 +2,9 @@ import { GoogleGenAI } from '@google/genai';
 import mime from 'mime';
 import { NextResponse } from 'next/server';
 
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+
 export async function POST(request) {
   try {
     // Parse the request body
@@ -23,9 +26,9 @@ export async function POST(request) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
-        { 
-          status: "error", 
-          error: "GEMINI_API_KEY environment variable is not set" 
+        {
+          status: "error",
+          error: "GEMINI_API_KEY environment variable is not set"
         },
         { status: 500 }
       );
@@ -61,6 +64,22 @@ export async function POST(request) {
         text: inputText,
       }
     ];
+
+    // Always attach a default character reference image from /public/images
+    try {
+      const refPath = path.join(process.cwd(), 'public', 'images', 'character_reference.jpg');
+      const refBuffer = await readFile(refPath);
+      const refBase64 = refBuffer.toString('base64');
+      const refMime = mime.getType(refPath) || 'image/jpeg';
+      parts.push({
+        inlineData: {
+          mimeType: refMime,
+          data: refBase64,
+        },
+      });
+    } catch (e) {
+      console.warn('Reference character image missing or unreadable:', e?.message || e);
+    }
 
     // Add selfie if provided
     if (selfie) {
@@ -134,9 +153,9 @@ export async function POST(request) {
   } catch (error) {
     console.error('Error generating story:', error);
     return NextResponse.json(
-      { 
-        status: "error", 
-        error: error.message || "An error occurred while generating the story" 
+      {
+        status: "error",
+        error: error.message || "An error occurred while generating the story"
       },
       { status: 500 }
     );
@@ -144,8 +163,8 @@ export async function POST(request) {
 }
 
 export async function GET() {
-  return NextResponse.json({ 
-    status: "info", 
-    message: "POST to this endpoint with selfie, systemPrompt, and story to generate an illustrated story" 
+  return NextResponse.json({
+    status: "info",
+    message: "POST to this endpoint with selfie, systemPrompt, and story to generate an illustrated story"
   });
 }
