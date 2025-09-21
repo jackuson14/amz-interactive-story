@@ -15,6 +15,7 @@ export const useTTS = (options = {}) => {
   
   const audioRef = useRef(null);
   const progressInterval = useRef(null);
+  const progressUpdateRef = useRef(null);
   const [volume, setVolumeState] = useState(0.9); // Default to 90% volume (louder)
 
   // Load available voices on mount
@@ -31,6 +32,9 @@ export const useTTS = (options = {}) => {
       }
       if (progressInterval.current) {
         clearInterval(progressInterval.current);
+      }
+      if (progressUpdateRef.current) {
+        cancelAnimationFrame(progressUpdateRef.current);
       }
     };
   }, []);
@@ -110,9 +114,14 @@ export const useTTS = (options = {}) => {
       });
 
       audio.addEventListener('timeupdate', () => {
-        if (audio.duration) {
-          setProgress((audio.currentTime / audio.duration) * 100);
+        if (progressUpdateRef.current) {
+          cancelAnimationFrame(progressUpdateRef.current);
         }
+        progressUpdateRef.current = requestAnimationFrame(() => {
+          if (audio.duration) {
+            setProgress((audio.currentTime / audio.duration) * 100);
+          }
+        });
       });
 
       audio.addEventListener('ended', () => {
@@ -128,8 +137,14 @@ export const useTTS = (options = {}) => {
       });
 
       audio.addEventListener('error', (e) => {
-        console.error('Audio playback error:', e);
-        setError('Audio playback failed');
+        // Only log meaningful audio errors, not empty objects
+        if (e.target && e.target.error) {
+          console.error('Audio playback error:', e.target.error);
+          setError(`Audio error: ${e.target.error.message || 'Playback failed'}`);
+        } else {
+          console.warn('Audio error (no details available)');
+          // Don't show generic error to user as it's usually not actionable
+        }
         setIsPlaying(false);
         setIsPaused(false);
       });

@@ -10,6 +10,8 @@ import { parseMarkdownStory } from "@/utils/markdownParser";
 import AIStoryGenerator from "@/components/AIStoryGenerator";
 import PoseDetection from "@/components/PoseDetection";
 import { useTTS } from "@/hooks/useTTS";
+import { useTranscribe } from "@/hooks/useTranscribe";
+
 
 
 const SELFIE_KEY = "selfie_v1";
@@ -43,8 +45,26 @@ export default function StoryPage() {
   const tts = useTTS({
     defaultVoice: 'Ivy', // Child-friendly default voice
     onEnd: () => {
-      if (speechSupported && !isListening) {
-        startListening();
+      // Auto-start voice recognition ONLY after TTS finishes AND if it's not a movement page
+      console.log('🔊 TTS finished - checking if should start listening', {
+        speechSupported,
+        isListening,
+        jumpDetectionActive,
+        currentPage: idx
+      });
+
+      if (speechSupported && !isListening && !jumpDetectionActive && hasUserInteracted && voiceNavEnabled) {
+        console.log('✅ Starting voice recognition after TTS ended');
+        setTimeout(() => {
+          startListening();
+        }, 1000); // Small delay to ensure TTS cleanup is complete
+      } else {
+        console.log('❌ Not starting voice recognition:', {
+          reason: !speechSupported ? 'speech not supported' :
+                  isListening ? 'already listening' :
+                  jumpDetectionActive ? 'movement page active' :
+                  !hasUserInteracted ? 'user has not interacted yet' : 'unknown'
+        });
       }
     }
   });
@@ -54,14 +74,92 @@ export default function StoryPage() {
   const [speechSupported, setSpeechSupported] = useState(false);
   const [recognizedText, setRecognizedText] = useState("");
   const [voiceError, setVoiceError] = useState("");
-  const recognitionRef = useRef(null);
+
+
+  // Amazon Transcribe hook for speech-to-text
+  const transcribe = useTranscribe({
+    languageCode: 'en-US',
+    onTranscript: (result) => {
+      if (!result.isFinal) {
+        setRecognizedText(result.transcript);
+      }
+    },
+    onFinalTranscript: (result) => {
+      const transcript = result.transcript || '';
+      const lowerTranscript = transcript.toLowerCase().trim();
+      const expectedKeyword = getExpectedKeyword();
+
+      console.log('\ud83c\udfa4 Transcribe final result:', {
+        transcript,
+        lowerTranscript,
+        expectedKeyword,
+        idx,
+        totalScenes: scenes.length,
+        isLastPage: idx === scenes.length - 1,
+      });
+
+      if (navigationInProgress.current) {
+        console.log('\ud83d\udeab Navigation already in progress, ignoring transcription result');
+        return;
+      }
+
+      if (expectedKeyword && lowerTranscript.includes(expectedKeyword)) {
+        if (expectedKeyword === 'goodnight' && idx === scenes.length - 1) {
+          setShowTheEnd(true);
+          setVoiceError('');
+        } else {
+          next();
+        }
+        stopListening();
+      } else if (expectedKeyword) {
+        // Special handling for variations
+        if ((expectedKeyword === "let's go" || expectedKeyword === "lets go") &&
+            (lowerTranscript.includes("lets go") || lowerTranscript.includes("let's go"))) {
+          next();
+          stopListening();
+          return;
+        }
+
+        if (expectedKeyword === 'goodnight' &&
+            (lowerTranscript.includes('good night') || lowerTranscript.includes('goodnight'))) {
+          if (idx === scenes.length - 1) {
+            setShowTheEnd(true);
+            setVoiceError('');
+          } else {
+            next();
+          }
+          stopListening();
+          return;
+        }
+      }
+
+        // Provide gentle guidance when keyword not recognized
+        if (expectedKeyword && lowerTranscript) {
+          setVoiceError(`Heard "${lowerTranscript}" — try saying "${expectedKeyword}"`);
+        }
+
+    },
+    onError: (error) => {
+      const msg = error?.message || '';
+      if (!/aborted|no-speech/i.test(msg)) {
+        setVoiceError(`Transcription error: ${msg}`);
+      }
+    },
+  });
 
   // Jump detection state
   const [jumpDetectionActive, setJumpDetectionActive] = useState(false);
-  
+
   // The End page state
   const [showTheEnd, setShowTheEnd] = useState(false);
-  
+  const [celebrationHandsUpDetected, setCelebrationHandsUpDetected] = useState(false);
+
+  // User interaction state for autoplay policy compliance
+  const [hasUserInteracted, setHasUserInteracted] = useState(false);
+  const [showStartButton, setShowStartButton] = useState(true);
+
+  const [voiceNavEnabled, setVoiceNavEnabled] = useState(true);
+
   // Navigation debouncing to prevent page skipping
   const navigationInProgress = useRef(false);
   const lastNavigationTime = useRef(0);
@@ -69,23 +167,34 @@ export default function StoryPage() {
   // Extract speech keyword from current page instruction
   const getPageSpeechKeyword = useCallback((pageText) => {
     if (!pageText) return null;
-    
+
+    const normalize = (s) => String(s)
+      .toLowerCase()
+      .replace(/["“”‘’]/g, '')       // remove quotes
+      .replace(/[!.,?]/g, '')         // remove punctuation
+      .replace(/[-–—]/g, ' ')         // hyphens/dashes to space
+      .replace(/\s+/g, ' ')          // collapse whitespace
+      .trim();
+
     console.log('🔍 Extracting keyword from text:', pageText);
-    
+
     // Look for pattern: Say "keyword" to ... (with optional punctuation)
-    const sayPattern = /Say "([^"]+)"[!.]?\s+to/i;
+    const sayPattern = /Say\s+"([^"]+)"[!.]?\s+to/i;
     const match = pageText.match(sayPattern);
-    
+
     if (match) {
-      // Remove punctuation from the keyword
-      const keyword = match[1].toLowerCase().replace(/[!.,?]/g, '');
+      const keyword = normalize(match[1]);
       console.log('✅ Found keyword:', keyword);
       return keyword;
     }
-    
+
     console.log('❌ No keyword pattern found');
     return null;
   }, []);
+
+
+  // getExpectedKeyword is defined after scenes/current are initialized to avoid TDZ
+
 
   // AI Story Generator
   const { generateAIStory, loading: aiLoading, error: aiError, setError: setAiError } = AIStoryGenerator({
@@ -147,27 +256,38 @@ export default function StoryPage() {
   }, [hasCompletedFlow, prompt, customScenes, generateAIStory, setAiError]);
 
   // Load selected sample story via query param (client), with a default fallback
-  const [storyId, setStoryId] = useState(null);
-  useEffect(() => {
+  const [storyId, setStoryId] = useState(() => {
+    // Initialize storyId immediately to prevent fallback flash
     try {
-      const qs = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-      const id = qs ? qs.get('story') : null;
-      const prompt = qs ? qs.get('prompt') : null;
+      if (typeof window !== 'undefined') {
+        const qs = new URLSearchParams(window.location.search);
+        const id = qs.get('story');
+        const prompt = qs.get('prompt');
 
-      if (id) {
-        setStoryId(id);
-      } else if (prompt && prompt.includes("Lily's Lost Smile")) {
-        // If the prompt mentions Lily's Lost Smile, load that specific story
-        setStoryId("lily-lost-smile");
-      } else {
+        if (id) {
+          return id;
+        } else if (prompt && prompt.includes("Lily's Lost Smile")) {
+          return "lily-lost-smile";
+        }
+      }
+    } catch {}
+    return null; // Return null instead of random story to prevent flash
+  });
+
+  // Fallback to random story only if no URL params and no custom scenes
+  useEffect(() => {
+    if (!storyId && !customScenes && typeof window !== 'undefined') {
+      const qs = new URLSearchParams(window.location.search);
+      if (!qs.get('story') && !qs.get('prompt')) {
+        // Only set random story if there are truly no URL parameters
         const list = SAMPLE_STORIES;
         if (list?.length) {
           const rid = list[Math.floor(Math.random() * list.length)]?.id;
           if (rid) setStoryId(rid);
         }
       }
-    } catch {}
-  }, []);
+    }
+  }, [storyId, customScenes]);
 
   const storyTitle = useMemo(() => {
     // For The Lost Smile, just use the generic title
@@ -177,10 +297,15 @@ export default function StoryPage() {
     if (customScenes) return "Your story";
     const f = SAMPLE_STORIES.find((s) => s.id === storyId);
     return f?.title ?? "Default";
-  }, [storyId, customScenes, characterName]);
+  }, [storyId, customScenes]);
 
   const baseScenes = useMemo(
     () => {
+      // Don't show any content until storyId is properly set
+      if (!storyId) {
+        return [];
+      }
+
       const f = SAMPLE_STORIES.find((s) => s.id === storyId);
       if (f) {
         // If it's a markdown story and we have parsed content, use that
@@ -193,6 +318,7 @@ export default function StoryPage() {
         }
         return f.scenes;
       }
+      // Only fallback to first story if we have a storyId but can't find it
       const first = SAMPLE_STORIES[0];
       return first ? first.scenes : [];
     },
@@ -200,8 +326,8 @@ export default function StoryPage() {
   );
   const scenes = customScenes ?? baseScenes;
 
-  // Show loading state if we're waiting for markdown content
-  const isLoadingMarkdown = storyId && SAMPLE_STORIES.find(s => s.id === storyId)?.isMarkdown && !markdownStory;
+  // Show loading state if we're waiting for markdown content (but not when using custom AI scenes)
+  const isLoadingMarkdown = !customScenes && storyId && SAMPLE_STORIES.find(s => s.id === storyId)?.isMarkdown && !markdownStory;
 
   useEffect(() => {
     try {
@@ -256,14 +382,33 @@ export default function StoryPage() {
   }, [storyId, characterName, characterGender]);
 
   const current = scenes[idx];
-  
+  // Prefer explicit scene keyword when available; fallback to parsing text
+  const getExpectedKeyword = () => {
+    // Do not use voice keywords on the last scene; last scene uses jump interaction
+    if (idx === scenes.length - 1) return null;
+    const page = scenes[idx];
+    if (page?.keyword) {
+      const normalize = (s) => String(s)
+        .toLowerCase()
+        .replace(/["\u201c\u201d\u2018\u2019]/g, '')
+        .replace(/[!.,?]/g, '')
+        .replace(/[-\u2013\u2014]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      return normalize(page.keyword);
+    }
+    return getPageSpeechKeyword(page?.text);
+  };
+
+
   // Debounced next function to prevent page skipping
   const next = useCallback(() => {
     const now = Date.now();
     const timeSinceLastNav = now - lastNavigationTime.current;
-    
+
     // Prevent multiple navigation calls within 1.5 seconds
     if (navigationInProgress.current || timeSinceLastNav < 1500) {
+
       console.log('🚫 Navigation blocked - too soon since last navigation', {
         navigationInProgress: navigationInProgress.current,
         timeSinceLastNav,
@@ -271,53 +416,49 @@ export default function StoryPage() {
       });
       return;
     }
-    
+
     navigationInProgress.current = true;
     lastNavigationTime.current = now;
-    
+
     console.log('📄 Navigating to next page', {
       currentPage: idx,
       nextPage: Math.min(idx + 1, scenes.length - 1)
     });
-    
+
     setIdx((v) => Math.min(v + 1, scenes.length - 1));
-    
+
     // Reset navigation flag after a delay
     setTimeout(() => {
       navigationInProgress.current = false;
     }, 1500);
   }, [scenes.length, idx]);
-  
-  const prev = () => setIdx((v) => Math.max(v - 1, 0));
 
-  // Stop listening for voice commands with improved reliability
+  const prev = useCallback(() => {
+    setIdx((v) => Math.max(v - 1, 0));
+  }, []);
+
+  // Stop listening via Amazon Transcribe
   const stopListening = useCallback(() => {
-    console.log('🛑 Stopping speech recognition', { isListening });
-    
-    if (recognitionRef.current && isListening) {
-      try {
-        // Only use stop() to avoid "aborted" error
-        recognitionRef.current.stop();
-      } catch (error) {
-        console.warn('Error stopping speech recognition:', error);
-      }
+    console.log('🛑 Stopping transcription', { isListening: transcribe.isListening });
+    try {
+      transcribe.stopListening();
+    } catch (error) {
+      console.warn('Error stopping transcription:', error);
     }
-    
     setIsListening(false);
-    setRecognizedText(''); // Clear recognized text
-  }, [isListening]);
+    setRecognizedText('');
+  }, [transcribe]);
 
-  // Activate jump detection on jungle scene (page 3, idx 2) for goodnight-zoo story
+
+  // Activate jump detection ONLY on the last scene for goodnight-zoo story
   useEffect(() => {
-    const shouldActivateJumpDetection = 
-      storyId === "goodnight-zoo" && 
-      idx === 2 && 
-      scenes.length > 0;
-    
+    const isLastScene = idx === scenes.length - 1 && scenes.length > 0;
+    const shouldActivateJumpDetection = storyId === "goodnight-zoo" && isLastScene;
+
     console.log('Jump detection check:', { storyId, idx, scenes: scenes.length, shouldActivate: shouldActivateJumpDetection });
-    
+
     setJumpDetectionActive(shouldActivateJumpDetection);
-    
+
     // Stop voice recognition when jump detection activates
     if (shouldActivateJumpDetection && isListening) {
       console.log('Stopping voice recognition for jump detection');
@@ -327,9 +468,15 @@ export default function StoryPage() {
 
   // Handle jump detection
   const handleJumpDetected = useCallback(() => {
-    console.log('Jump detected! Moving to next scene...');
-    next();
-  }, [next]);
+    console.log('Jump detected!');
+    const isLastScene = idx === scenes.length - 1;
+    if (isLastScene) {
+      setShowTheEnd(true);
+    } else {
+      next();
+    }
+  }, [idx, scenes.length, next]);
+
 
   // Cleanup speech recognition when showing "The End" page
   useEffect(() => {
@@ -339,198 +486,61 @@ export default function StoryPage() {
     }
   }, [showTheEnd, isListening, stopListening]);
 
-  // Initialize speech recognition
+  // Amazon Transcribe: sync support/listening status with UI state
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        setSpeechSupported(true);
-        
-        // Clean up any existing recognition instance
-        if (recognitionRef.current) {
-          try {
-            recognitionRef.current.stop();
-            recognitionRef.current.abort();
-          } catch (error) {
-            console.warn('Error cleaning up existing recognition:', error);
-          }
-        }
-        
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = false; // Disable interim results to prevent multiple triggers
-        recognition.lang = 'en-US';
-        
-        recognition.onresult = (event) => {
-          let transcript = '';
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            transcript += event.results[i][0].transcript;
-          }
-          
-          console.log('🎤 Speech recognition result:', {
-            transcript,
-            resultIndex: event.resultIndex,
-            resultsLength: event.results.length,
-            isFinal: event.results[event.results.length - 1].isFinal,
-            currentPage: idx
-          });
-          
-          setRecognizedText(transcript);
-          
-          // Only process final results to prevent multiple triggers
-          const lastResult = event.results[event.results.length - 1];
-          if (!lastResult.isFinal) {
-            console.log('🚫 Ignoring interim result');
-            return;
-          }
-          
-          // Don't process if navigation is already in progress
-          if (navigationInProgress.current) {
-            console.log('🚫 Navigation already in progress, ignoring speech result');
-            return;
-          }
-          
-          // Get the specific keyword for current page
-          const expectedKeyword = getPageSpeechKeyword(current?.text);
-          const lowerTranscript = transcript.toLowerCase().trim();
-          
-          console.log('🔍 Checking for page-specific keyword:', expectedKeyword, 'in transcript:', lowerTranscript);
-          console.log('📍 Current page info:', { idx, totalScenes: scenes.length, isLastPage: idx === scenes.length - 1 });
-          
-          if (expectedKeyword && lowerTranscript.includes(expectedKeyword)) {
-            console.log('✅ Page-specific keyword detected:', expectedKeyword, 'triggering navigation');
-            
-            // Check if this is the final "goodnight" on the last page
-            if (expectedKeyword === "goodnight" && idx === scenes.length - 1) {
-              console.log('🌙 Final goodnight detected, showing The End page');
-              setShowTheEnd(true);
-              // Clear any voice errors since we're ending the story
-              setVoiceError('');
-            } else {
-              // Progress to next scene
-              console.log('📄 Moving to next page');
-              next();
-            }
-            
-            // Stop listening after keyword detection
-            stopListening();
-          } else if (expectedKeyword) {
-            console.log('🚫 Expected keyword not found. Looking for:', expectedKeyword);
-            console.log('🔍 Full transcript received:', lowerTranscript);
-            
-            // Special handling for "let's go" variations
-            if (expectedKeyword === "let's go" || expectedKeyword === "lets go") {
-              if (lowerTranscript.includes("lets go") || lowerTranscript.includes("let's go") || lowerTranscript.includes("lets go")) {
-                console.log('✅ "Let\'s go" variation detected, triggering navigation');
-                next();
-                stopListening();
-                return;
-              }
-            }
-            
-            // Special handling for "goodnight" variations
-            if (expectedKeyword === "goodnight") {
-              if (lowerTranscript.includes("good night") || lowerTranscript.includes("goodnight")) {
-                console.log('✅ "Goodnight" variation detected');
-                // Check if this is the final "goodnight" on the last page
-                if (idx === scenes.length - 1) {
-                  console.log('🌙 Final goodnight detected, showing The End page');
-                  setShowTheEnd(true);
-                  setVoiceError('');
-                } else {
-                  console.log('📄 Moving to next page');
-                  next();
-                }
-                stopListening();
-                return;
-              }
-            }
-          }
-        };
-        
-        recognition.onerror = (event) => {
-          console.error('Speech recognition error:', event.error);
-          // Don't show "aborted" or "no-speech" errors to users
-          if (event.error !== 'aborted' && event.error !== 'no-speech') {
-            setVoiceError(`Speech recognition error: ${event.error}`);
-          } else if (event.error === 'no-speech') {
-            console.log('🔇 No speech detected - this is normal, you can try speaking again');
-          }
-          setIsListening(false);
-        };
-        
-        recognition.onend = () => {
-          console.log('🔚 Speech recognition ended');
-          setIsListening(false);
-        };
-        
-        recognitionRef.current = recognition;
-      } else {
-        console.log('Speech recognition not supported');
-        setSpeechSupported(false);
-      }
+    setSpeechSupported(transcribe.isSupported);
+  }, [transcribe.isSupported]);
+
+  useEffect(() => {
+    if (isListening !== transcribe.isListening) {
+      setIsListening(transcribe.isListening);
     }
-    
-    // Cleanup on unmount
-    return () => {
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-          recognitionRef.current.abort();
-        } catch (error) {
-          console.warn('Error cleaning up recognition on unmount:', error);
-        }
-      }
-    };
-  }, [next]);
-  
-  // Start listening for voice commands
-  const startListening = useCallback(() => {
-    console.log('🎤 Starting speech recognition', {
-      speechSupported,
-      hasRecognition: !!recognitionRef.current,
+  }, [transcribe.isListening, isListening]);
+
+  useEffect(() => {
+    if (transcribe.error) {
+      setVoiceError(transcribe.error);
+    }
+  }, [transcribe.error]);
+
+
+  // Start listening for voice commands via Amazon Transcribe
+  const startListening = useCallback(async () => {
+    console.log('🎤 Starting Amazon Transcribe', {
+      supported: transcribe.isSupported,
+      ready: transcribe.isReady,
+      isListening: transcribe.isListening,
       currentPage: idx,
-      isCurrentlyListening: isListening
     });
-    
-    if (!speechSupported || !recognitionRef.current) {
-      console.warn('🚫 Speech recognition not supported');
-      setVoiceError('Speech recognition not supported in this browser');
+
+
+    if (!voiceNavEnabled) {
+      setVoiceError('Voice navigation is turned off');
       return;
     }
-    
-    // Stop any existing recognition first
-    if (isListening) {
-      console.log('🔄 Stopping existing recognition before starting new one');
-      try {
-        recognitionRef.current?.stop();
-      } catch (error) {
-        console.warn('Error stopping recognition:', error);
-      }
-      setIsListening(false);
-      // Wait a moment for cleanup
-      setTimeout(() => {
-        startListening();
-      }, 200);
-      return;
-    }
-    
+
     try {
       setVoiceError('');
       setRecognizedText('');
-      recognitionRef.current.start();
-      setIsListening(true);
-      console.log('✅ Speech recognition started successfully');
-    } catch (error) {
-      console.error('❌ Failed to start speech recognition:', error);
-      // Reset the listening state on error
-      setIsListening(false);
-      // Don't show the error if it's about already being started
-      if (!error.message.includes('already started')) {
+
+      if (!transcribe.isReady) {
+        await transcribe.requestPermission().catch(() => {});
+      }
+
+      const ok = await transcribe.startListening();
+      if (ok) {
+        setIsListening(true);
+        console.log('✅ Transcription started successfully');
+      } else {
+        setIsListening(false);
         setVoiceError('Failed to start voice recognition');
       }
+    } catch (error) {
+      console.error('❌ Failed to start transcription:', error);
+      setIsListening(false);
+      setVoiceError('Failed to start voice recognition');
     }
-  }, [speechSupported, idx, isListening, stopListening]);
+  }, [transcribe, idx]);
 
   // Handle story generation - always use AI
   const handleGenerate = useCallback(async (ideaArg) => {
@@ -595,66 +605,97 @@ export default function StoryPage() {
   }, [customScenes, messages.length, handleGenerate, storyId]);
 
   // AWS Polly TTS functions
-  const speakCurrent = async () => {
+  const speakCurrent = useCallback(async () => {
     try {
       if (!current) return;
-      
+
       // If paused, resume
       if (tts.isPaused) {
         tts.play();
         return;
       }
-      
-      // Create story text with character name replacement
-      const storyText = `${current.title}. ${current.text}`;
-      const personalizedText = storyText.replace(/Lily/g, characterName);
-      
+
+      // Create story text with character name replacement (title removed from UI, so don't include in speech)
+      const personalizedText = current.text.replace(/Lily/g, characterName);
+
+      // Append the voice instruction at the end (for non-final scenes)
+      const kw = getExpectedKeyword();
+      const instructionToSpeak = kw ? (current.instruction || `Say "${kw}" to go to the next page.`) : null;
+      const finalText = instructionToSpeak ? `${personalizedText} ${instructionToSpeak}` : personalizedText;
+
       // Stop current audio and synthesize new speech
-      
-      const result = await tts.synthesizeAndPlay(personalizedText);
-      
+      const result = await tts.synthesizeAndPlay(finalText);
+
       if (result.success) {
-        // Auto-start listening after read-aloud finishes (when audio ends)
+        // Auto-start listening after read-aloud finishes
         // This will be handled by the audio 'ended' event in useTTS hook
       }
     } catch (error) {
       console.error('Error speaking current scene:', error);
     }
-  };
+  }, [current, tts, characterName]);
 
-  const pauseReading = () => {
+  const pauseReading = useCallback(() => {
     tts.pause();
-  };
+  }, [tts]);
 
-  const stopReading = () => {
+  const stopReading = useCallback(() => {
     tts.stop();
     // Stop listening when read-aloud is manually stopped
     if (isListening) {
       stopListening();
     }
-  };
-  // If playing, re-speak when scene changes
-  useEffect(() => {
-    if (tts.isPlaying) speakCurrent();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idx, scenes]);
+  }, [tts, isListening, stopListening]);
 
-  // Auto-play when story loads or scene changes
-  useEffect(() => {
-    if (current && !tts.isPlaying && !tts.isPaused) {
-      // Stop any existing listening when scene changes
-      if (isListening) {
-        stopListening();
+  // Handle initial user interaction to enable autoplay
+  const handleStartStory = useCallback(async () => {
+    console.log('🎬 User started the story - enabling autoplay');
+    setHasUserInteracted(true);
+    setShowStartButton(false);
+
+    // Start playing immediately after user interaction
+    if (current) {
+      try {
+        await speakCurrent();
+      } catch (error) {
+        console.error('Initial play failed:', error);
       }
-      // Small delay to ensure page is ready
+    }
+  }, [current, speakCurrent, setHasUserInteracted, setShowStartButton]);
+  // Auto-play when scene changes (idx changes) - only after user interaction
+  useEffect(() => {
+    if (!current || !hasUserInteracted) return;
+
+    console.log('Scene changed, stopping current audio and starting new scene');
+
+    // Always stop current audio when scene changes
+    tts.stop();
+
+    // Stop any existing listening when scene changes
+    if (isListening) {
+      stopListening();
+    }
+
+    // Small delay to ensure cleanup is complete, then start new audio
+    const timer = setTimeout(() => {
+      speakCurrent();
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [idx, hasUserInteracted]); // Only trigger when scene index changes AND user has interacted
+
+  // Initial auto-play when story first loads - only after user interaction
+  useEffect(() => {
+    if (current && idx === 0 && !tts.isPlaying && !tts.isPaused && hasUserInteracted) {
+      console.log('Initial story load, starting first scene audio');
+      // Small delay to ensure component is fully mounted
       const timer = setTimeout(() => {
         speakCurrent();
-      }, 500);
-      
+      }, 1000);
+
       return () => clearTimeout(timer);
     }
-  }, [current, isListening, tts.isPlaying, tts.isPaused, speakCurrent, stopListening, storyId]); // Trigger when current scene or story changes
-
+  }, [current, storyId, hasUserInteracted]); // Only trigger when story first loads AND user has interacted
 
   const startNewStory = useCallback(() => {
     try {
@@ -697,17 +738,61 @@ export default function StoryPage() {
                 What a wonderful bedtime story! All the animals at the zoo are now fast asleep,
                 and it&apos;s time for you to have sweet dreams too.
               </p>
-              <div className="space-y-4">
-                <p className="text-lg text-gray-600">
-                  Thank you for joining us on this magical journey! 🦁🐵🐧🦛
-                </p>
-                <button 
-                  onClick={() => window.location.href = '/play/idea'}
-                  className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 px-8 rounded-xl text-lg transition-colors shadow-lg"
-                >
-                  📚 Choose Another Story
-                </button>
-              </div>
+
+              {!celebrationHandsUpDetected ? (
+                <>
+                  {/* Hands up celebration section - shown before gesture */}
+                  <div className="mb-8 p-6 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-xl text-white animate-pulse">
+                    <p className="text-2xl font-bold mb-3">
+                      🙌 Time to Celebrate! 🙌
+                    </p>
+                    <p className="text-xl mb-4 font-semibold">
+                      Lift both hands up high to unlock another story!
+                    </p>
+                    <p className="text-sm opacity-90">
+                      Show the camera both your hands raised up like you&apos;re cheering!
+                    </p>
+                  </div>
+
+                  {/* Pose detection component for hands-up celebration */}
+                  <PoseDetection
+                    isActive={true}
+                    detectionMode="handsUp"
+                    onHandsUpDetected={() => {
+                      console.log('🙌 Celebration hands up detected!');
+                      setCelebrationHandsUpDetected(true);
+                    }}
+                  />
+
+                  <p className="text-lg text-gray-600 mt-6">
+                    Raise both hands high to continue! 🙌
+                  </p>
+                </>
+              ) : (
+                <>
+                  {/* Success message after hands up */}
+                  <div className="mb-8 p-6 bg-gradient-to-r from-purple-400 to-pink-500 rounded-xl text-white">
+                    <p className="text-2xl font-bold mb-3">
+                      🌟 Amazing Celebration! 🌟
+                    </p>
+                    <p className="text-lg">
+                      You did it! Ready for another adventure?
+                    </p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <p className="text-lg text-gray-600">
+                      Thank you for joining us on this magical journey! 🦁🐵🐧🦛
+                    </p>
+                    <button
+                      onClick={() => window.location.href = '/play/idea'}
+                      className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 px-8 rounded-xl text-lg transition-all transform hover:scale-105 shadow-lg animate-bounce"
+                    >
+                      📚 Choose Another Story
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -717,6 +802,27 @@ export default function StoryPage() {
 
   return (
     <main className="min-h-screen bg-white">
+      {/* Start Story Button Overlay */}
+      {showStartButton && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-white rounded-xl shadow-2xl p-8 max-w-md mx-4 text-center">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">🎬 Ready for Your Story?</h2>
+            <p className="text-gray-600 mb-6">
+              Click the button below to start your magical bedtime story with voice narration!
+            </p>
+            <button
+              onClick={handleStartStory}
+              className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold py-4 px-8 rounded-xl text-lg transition-all transform hover:scale-105 shadow-lg"
+            >
+              🌟 Start Story 🌟
+            </button>
+            <p className="text-xs text-gray-500 mt-4">
+              This enables audio playback for the story
+            </p>
+          </div>
+        </div>
+      )}
+
       {aiError && (
         <section className="px-6 sm:px-10 md:px-16 pt-4">
           <div className="mx-auto max-w-5xl">
@@ -756,11 +862,11 @@ export default function StoryPage() {
             className="object-cover"
             unoptimized
           />
-          
+
           {/* Back button - top left corner */}
           <div className="absolute top-6 left-6 z-20">
-            <Link 
-              href="/play" 
+            <Link
+              href="/play"
               className="w-12 h-12 bg-white/90 hover:bg-white backdrop-blur-sm rounded-full shadow-lg flex items-center justify-center text-gray-700 hover:text-gray-900 transition-all transform hover:scale-105"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -768,7 +874,7 @@ export default function StoryPage() {
               </svg>
             </Link>
           </div>
-          
+
           {/* Content overlay */}
           <div className="relative z-10 h-full flex">
             {/* Left side - character */}
@@ -776,7 +882,7 @@ export default function StoryPage() {
               {storyId === "goodnight-zoo" && (
                 <div className="flex items-end justify-center h-full pb-16">
                   <Image
-                    src={`/stories/zoo/char/boy${Math.min(idx + 1, 2)}.png`}
+                    src={`/stories/zoo/char/boy${idx < 3 ? 1 : 2}.png`}
                     alt="Main character"
                     width={300}
                     height={400}
@@ -786,35 +892,64 @@ export default function StoryPage() {
                 </div>
               )}
             </div>
-            
+
             {/* Right side - text content */}
             <div className="w-1/2 flex flex-col justify-center p-8">
               {/* Story content */}
               <div className="text-white drop-shadow-lg">
-                <h2 className="text-3xl md:text-4xl font-extrabold mb-6 drop-shadow-lg">{current.title}</h2>
                 <p className="text-xl md:text-2xl leading-relaxed mb-4 drop-shadow-lg">{current.text}</p>
-                
-                {/* Special jump instruction for jungle scene */}
+
+
+                {(() => {
+                  const kw = getExpectedKeyword();
+                  return kw ? (
+                    <div className="mb-4 p-4 bg-white/20 backdrop-blur-sm rounded-lg border-2 border-white/40">
+                      <p className="text-white text-lg font-bold text-center drop-shadow-lg">Say &quot;{kw}&quot; to go to the next page</p>
+                    </div>
+                  ) : null;
+                })()}
+
+                {/* Final scene jump instruction */}
                 {jumpDetectionActive && (
                   <div className="mb-4 p-4 bg-green-500/90 backdrop-blur-sm rounded-lg border-2 border-green-300">
                     <p className="text-white text-lg font-bold text-center drop-shadow-lg">
-                      🐒 Jump like a monkey to swing to the next page! 🐒
+                      🎉 Jump to finish the story! 🎉
                     </p>
                     <p className="text-white/90 text-sm text-center mt-1">
-                      Stand back from your camera and jump up and down!
+                      Stand back from your camera so we can see you, then jump!
                     </p>
+
+	                    {/* Voice navigation toggle */}
+	                    <div className="mb-2 flex items-center gap-2">
+	                      <label className="text-sm font-medium text-white drop-shadow-lg">Voice navigation</label>
+	                      <input
+	                        type="checkbox"
+	                        checked={voiceNavEnabled}
+	                        onChange={(e) => {
+	                          setVoiceNavEnabled(e.target.checked);
+	                          if (!e.target.checked && isListening) {
+	                            stopListening();
+	                          }
+	                        }}
+	                        className="rounded"
+	                      />
+	                      {isListening && (
+	                        <span className="ml-2 text-xs text-white/90 drop-shadow-lg">Listening...</span>
+	                      )}
+	                    </div>
+
                   </div>
                 )}
 
                 {/* Navigation buttons */}
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                   <button onClick={prev} disabled={idx === 0} className="w-full sm:w-auto rounded-md bg-white/90 border border-gray-300 px-5 py-3 text-lg text-gray-700 disabled:opacity-40 hover:bg-white">Previous</button>
-                  
+
                   {/* Voice recognition controls - disabled on jungle scene */}
                   {speechSupported && !jumpDetectionActive && (
                     <div className="w-full">
                       {!isListening ? (
-                        <button 
+                        <button
                           onClick={startListening}
                           className="flex items-center justify-center gap-2 rounded-md bg-purple-500 hover:bg-purple-600 text-white px-5 py-3 text-lg transition-colors w-full sm:w-auto"
                         >
@@ -824,7 +959,7 @@ export default function StoryPage() {
                           Listen
                         </button>
                       ) : (
-                        <button 
+                        <button
                           onClick={stopListening}
                           className="flex items-center justify-center gap-2 rounded-md bg-red-500 hover:bg-red-600 text-white px-5 py-3 text-lg transition-colors animate-pulse w-full sm:w-auto"
                         >
@@ -834,7 +969,7 @@ export default function StoryPage() {
                           Stop Listening
                         </button>
                       )}
-                      
+
                       {recognizedText && (
                         <div className="mt-2 p-2 bg-white/90 rounded-lg border border-purple-200">
                           <p className="text-sm text-purple-800">
@@ -842,23 +977,37 @@ export default function StoryPage() {
                           </p>
                         </div>
                       )}
-                      
+
                       {voiceError && (
                         <div className="mt-2 p-2 bg-white/90 rounded-lg border border-red-200">
                           <p className="text-sm text-red-800">{voiceError}</p>
                         </div>
                       )}
-                      
+
                       <div className="mt-2 p-2 bg-white/90 rounded-lg border border-blue-200">
                         <p className="text-sm text-blue-800 font-medium mb-1">
                           🎤 Voice Commands:
                         </p>
                         {(() => {
-                          const expectedKeyword = getPageSpeechKeyword(current?.text);
+                          if (!hasUserInteracted) {
+                            return (
+                              <p className="text-xs text-gray-600">
+                                🎬 Click &quot;Start Story&quot; to begin audio and voice commands
+                              </p>
+                            );
+                          }
+                          const expectedKeyword = getExpectedKeyword();
+                          if (tts.isPlaying) {
+                            return (
+                              <p className="text-xs text-orange-600">
+                                🔊 Reading story... Voice recognition will start when finished.
+                              </p>
+                            );
+                          }
                           return (
                             <p className="text-xs text-blue-600">
-                              {expectedKeyword ? 
-                                `Say: "${expectedKeyword}" to continue!` : 
+                              {expectedKeyword ?
+                                `Say: "${expectedKeyword}" to continue!` :
                                 'Listening for voice commands...'
                               }
                             </p>
@@ -867,14 +1016,14 @@ export default function StoryPage() {
                       </div>
                     </div>
                   )}
-                  
+
                   {/* AWS Polly TTS Controls */}
                   <div className="flex flex-col gap-3">
                     {/* Voice Selection */}
                     <div className="flex items-center gap-2">
                       <label className="text-sm font-medium text-white drop-shadow-lg">Voice:</label>
-                      <select 
-                        value={tts.selectedVoice} 
+                      <select
+                        value={tts.selectedVoice}
                         onChange={(e) => tts.setSelectedVoice(e.target.value)}
                         className="text-sm bg-white/90 border border-gray-300 rounded px-2 py-1 text-gray-800"
                       >
@@ -885,7 +1034,7 @@ export default function StoryPage() {
                         ))}
                       </select>
                     </div>
-                    
+
                     {/* Volume Control */}
                     <div className="flex items-center gap-2">
                       <label className="text-sm font-medium text-white drop-shadow-lg">Volume:</label>
@@ -902,7 +1051,7 @@ export default function StoryPage() {
                         {Math.round((tts.volume || 0.9) * 100)}%
                       </span>
                     </div>
-                    
+
                     {/* Natural Speech Toggle */}
                     <div className="flex items-center gap-2">
                       <label className="text-sm font-medium text-white drop-shadow-lg">Natural Speech:</label>
@@ -916,7 +1065,7 @@ export default function StoryPage() {
                         {tts.naturalSpeech ? 'Enhanced' : 'Standard'}
                       </span>
                     </div>
-                    
+
                     {/* Play/Pause/Stop Controls */}
                     <div className="flex gap-2">
                       {tts.isLoading && (
@@ -925,10 +1074,10 @@ export default function StoryPage() {
                           <span>Generating speech...</span>
                         </div>
                       )}
-                      
+
                       {!tts.isPlaying && !tts.isPaused && !tts.isLoading && (
-                        <button 
-                          onClick={speakCurrent} 
+                        <button
+                          onClick={speakCurrent}
                           className="flex items-center gap-2 rounded-md bg-green-500 hover:bg-green-600 text-white px-5 py-3 text-lg transition-colors"
                         >
                           <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -937,10 +1086,10 @@ export default function StoryPage() {
                           Play with Polly
                         </button>
                       )}
-                      
+
                       {tts.isPlaying && (
-                        <button 
-                          onClick={pauseReading} 
+                        <button
+                          onClick={pauseReading}
                           className="flex items-center gap-2 rounded-md bg-yellow-500 hover:bg-yellow-600 text-white px-5 py-3 text-lg transition-colors"
                         >
                           <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -949,10 +1098,10 @@ export default function StoryPage() {
                           Pause
                         </button>
                       )}
-                      
+
                       {tts.isPaused && (
-                        <button 
-                          onClick={speakCurrent} 
+                        <button
+                          onClick={speakCurrent}
                           className="flex items-center gap-2 rounded-md bg-green-500 hover:bg-green-600 text-white px-5 py-3 text-lg transition-colors"
                         >
                           <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -961,10 +1110,10 @@ export default function StoryPage() {
                           Resume
                         </button>
                       )}
-                      
+
                       {(tts.isPlaying || tts.isPaused) && (
-                        <button 
-                          onClick={stopReading} 
+                        <button
+                          onClick={stopReading}
                           className="flex items-center gap-2 rounded-md bg-red-500 hover:bg-red-600 text-white px-5 py-3 text-lg transition-colors"
                         >
                           <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -974,7 +1123,7 @@ export default function StoryPage() {
                         </button>
                       )}
                     </div>
-                    
+
                     {/* Progress Bar */}
                     {tts.duration > 0 && (
                       <div className="w-full">
@@ -983,14 +1132,14 @@ export default function StoryPage() {
                           <span>{Math.floor(tts.duration / 60)}:{Math.floor(tts.duration % 60).toString().padStart(2, '0')}</span>
                         </div>
                         <div className="w-full bg-white/30 rounded-full h-2">
-                          <div 
-                            className="bg-white h-2 rounded-full transition-all duration-300" 
+                          <div
+                            className="bg-white h-2 rounded-full transition-all duration-300"
                             style={{ width: `${tts.progress}%` }}
                           ></div>
                         </div>
                       </div>
                     )}
-                    
+
                     {/* Error Display */}
                     {tts.error && (
                       <div className="text-red-200 text-sm bg-red-500/20 rounded px-2 py-1">
@@ -998,7 +1147,7 @@ export default function StoryPage() {
                       </div>
                     )}
                   </div>
-                  
+
                   <button onClick={next} disabled={idx === scenes.length - 1} className="w-full sm:w-auto rounded-md bg-indigo-600 text-white px-5 py-3 text-lg disabled:opacity-40 hover:bg-indigo-500">Next</button>
                 </div>
               </div>
@@ -1043,19 +1192,6 @@ export default function StoryPage() {
                       className="object-cover rounded-xl"
                       unoptimized
                     />
-                    {/* Optional overlay for user selfie in corner */}
-                    {selfie && (
-                      <div className="absolute bottom-4 right-4">
-                        <Image
-                          src={selfie.url}
-                          alt="you"
-                          width={80}
-                          height={80}
-                          className="w-16 h-16 sm:w-20 sm:h-20 rounded-full shadow-lg ring-2 ring-white/80"
-                          unoptimized
-                        />
-                      </div>
-                    )}
                   </div>
                 ) : (
                   // No story image - use original gradient design
@@ -1064,11 +1200,6 @@ export default function StoryPage() {
                       <div className="w-48 h-48 rounded-full bg-white/60 blur-2xl absolute -top-10 -left-10" />
                       <div className="w-56 h-56 rounded-full bg-white/40 blur-2xl absolute bottom-0 right-0" />
                     </div>
-                    <div className="absolute left-1/2 -translate-x-1/2 bottom-6">
-                      {selfie && (
-                        <Image src={selfie.url} alt="you" width={192} height={192} className="w-32 sm:w-40 md:w-48 h-auto rounded-lg shadow-lg ring-1 ring-black/10" unoptimized />
-                      )}
-                    </div>
                   </>
                 )}
               </div>
@@ -1076,29 +1207,40 @@ export default function StoryPage() {
               {/* Right: Big readable text */}
               <div className="flex flex-col justify-between">
                 <div>
-                  <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900">{current.title}</h2>
-                  <p className="mt-4 text-lg md:text-xl leading-relaxed text-gray-800">{current.text}</p>
-                  
-                  {/* Special jump instruction for jungle scene */}
+                  <p className="text-lg md:text-xl leading-relaxed text-gray-800">{current.text}</p>
+
+                  {(() => {
+                    const kw = getExpectedKeyword();
+                    return kw ? (
+                      <div className="mt-4 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
+                        <p className="text-blue-800 text-lg font-bold text-center">Say &quot;{kw}&quot; to go to the next page</p>
+                      </div>
+                    ) : null;
+                  })()}
+
+
+                  {/* Final scene jump instruction */}
                   {jumpDetectionActive && (
                     <div className="mt-4 p-4 bg-green-100 border-2 border-green-300 rounded-lg">
                       <p className="text-green-800 text-lg font-bold text-center">
-                        🐒 Jump like a monkey to swing to the next page! 🐒
+                        🎉 Jump to finish the story! 🎉
                       </p>
                       <p className="text-green-700 text-sm text-center mt-1">
-                        Stand back from your camera and jump up and down!
+                        Stand back from your camera so we can see you, then jump!
+
+
                       </p>
                     </div>
                   )}
                 </div>
                 <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                   <button onClick={prev} disabled={idx === 0} className="w-full sm:w-auto rounded-md border border-gray-300 px-5 py-3 text-lg text-gray-700 disabled:opacity-40 hover:bg-gray-100">Previous</button>
-                  
+
                   {/* Voice recognition controls - disabled on jungle scene */}
                   {speechSupported && !jumpDetectionActive && (
                     <div className="w-full">
                       {!isListening ? (
-                        <button 
+                        <button
                           onClick={startListening}
                           className="flex items-center justify-center gap-2 rounded-md bg-purple-500 hover:bg-purple-600 text-white px-5 py-3 text-lg transition-colors w-full sm:w-auto"
                         >
@@ -1108,17 +1250,37 @@ export default function StoryPage() {
                           Listen
                         </button>
                       ) : (
-                        <button 
+                        <button
                           onClick={stopListening}
                           className="flex items-center justify-center gap-2 rounded-md bg-red-500 hover:bg-red-600 text-white px-5 py-3 text-lg transition-colors animate-pulse w-full sm:w-auto"
                         >
                           <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z"/>
                           </svg>
+
+	                    {/* Voice navigation toggle */}
+	                    <div className="mb-2 flex items-center gap-2">
+	                      <label className="text-sm font-medium text-gray-700">Voice navigation</label>
+	                      <input
+	                        type="checkbox"
+	                        checked={voiceNavEnabled}
+	                        onChange={(e) => {
+	                          setVoiceNavEnabled(e.target.checked);
+	                          if (!e.target.checked && isListening) {
+	                            stopListening();
+	                          }
+	                        }}
+	                        className="rounded"
+	                      />
+	                      {isListening && (
+	                        <span className="ml-2 text-xs text-gray-600">Listening...</span>
+	                      )}
+	                    </div>
+
                           Stop Listening
                         </button>
                       )}
-                      
+
                       {recognizedText && (
                         <div className="mt-2 p-2 bg-purple-50 rounded-lg border border-purple-200">
                           <p className="text-sm text-purple-800">
@@ -1126,23 +1288,37 @@ export default function StoryPage() {
                           </p>
                         </div>
                       )}
-                      
+
                       {voiceError && (
                         <div className="mt-2 p-2 bg-red-50 rounded-lg border border-red-200">
                           <p className="text-sm text-red-800">{voiceError}</p>
                         </div>
                       )}
-                      
+
                       <div className="mt-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
                         <p className="text-sm text-blue-800 font-medium mb-1">
                           🎤 Voice Commands:
                         </p>
                         {(() => {
-                          const expectedKeyword = getPageSpeechKeyword(current?.text);
+                          if (!hasUserInteracted) {
+                            return (
+                              <p className="text-xs text-gray-600">
+                                🎬 Click &quot;Start Story&quot; to begin audio and voice commands
+                              </p>
+                            );
+                          }
+                          const expectedKeyword = getExpectedKeyword();
+                          if (tts.isPlaying) {
+                            return (
+                              <p className="text-xs text-orange-600">
+                                🔊 Reading story... Voice recognition will start when finished.
+                              </p>
+                            );
+                          }
                           return (
                             <p className="text-xs text-blue-600">
-                              {expectedKeyword ? 
-                                `Say: "${expectedKeyword}" to continue!` : 
+                              {expectedKeyword ?
+                                `Say: "${expectedKeyword}" to continue!` :
                                 'Listening for voice commands...'
                               }
                             </p>
@@ -1151,14 +1327,14 @@ export default function StoryPage() {
                       </div>
                     </div>
                   )}
-                  
+
                   {/* AWS Polly TTS Controls */}
                   <div className="flex flex-col gap-3">
                     {/* Voice Selection */}
                     <div className="flex items-center gap-2">
                       <label className="text-sm font-medium text-white drop-shadow-lg">Voice:</label>
-                      <select 
-                        value={tts.selectedVoice} 
+                      <select
+                        value={tts.selectedVoice}
                         onChange={(e) => tts.setSelectedVoice(e.target.value)}
                         className="text-sm bg-white/90 border border-gray-300 rounded px-2 py-1 text-gray-800"
                       >
@@ -1169,7 +1345,7 @@ export default function StoryPage() {
                         ))}
                       </select>
                     </div>
-                    
+
                     {/* Volume Control */}
                     <div className="flex items-center gap-2">
                       <label className="text-sm font-medium text-white drop-shadow-lg">Volume:</label>
@@ -1186,7 +1362,7 @@ export default function StoryPage() {
                         {Math.round((tts.volume || 0.9) * 100)}%
                       </span>
                     </div>
-                    
+
                     {/* Natural Speech Toggle */}
                     <div className="flex items-center gap-2">
                       <label className="text-sm font-medium text-white drop-shadow-lg">Natural Speech:</label>
@@ -1200,7 +1376,7 @@ export default function StoryPage() {
                         {tts.naturalSpeech ? 'Enhanced' : 'Standard'}
                       </span>
                     </div>
-                    
+
                     {/* Play/Pause/Stop Controls */}
                     <div className="flex gap-2">
                       {tts.isLoading && (
@@ -1209,10 +1385,10 @@ export default function StoryPage() {
                           <span>Generating speech...</span>
                         </div>
                       )}
-                      
+
                       {!tts.isPlaying && !tts.isPaused && !tts.isLoading && (
-                        <button 
-                          onClick={speakCurrent} 
+                        <button
+                          onClick={speakCurrent}
                           className="flex items-center gap-2 rounded-md bg-green-500 hover:bg-green-600 text-white px-5 py-3 text-lg transition-colors"
                         >
                           <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -1221,10 +1397,10 @@ export default function StoryPage() {
                           Play with Polly
                         </button>
                       )}
-                      
+
                       {tts.isPlaying && (
-                        <button 
-                          onClick={pauseReading} 
+                        <button
+                          onClick={pauseReading}
                           className="flex items-center gap-2 rounded-md bg-yellow-500 hover:bg-yellow-600 text-white px-5 py-3 text-lg transition-colors"
                         >
                           <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -1233,10 +1409,10 @@ export default function StoryPage() {
                           Pause
                         </button>
                       )}
-                      
+
                       {tts.isPaused && (
-                        <button 
-                          onClick={speakCurrent} 
+                        <button
+                          onClick={speakCurrent}
                           className="flex items-center gap-2 rounded-md bg-green-500 hover:bg-green-600 text-white px-5 py-3 text-lg transition-colors"
                         >
                           <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -1245,10 +1421,10 @@ export default function StoryPage() {
                           Resume
                         </button>
                       )}
-                      
+
                       {(tts.isPlaying || tts.isPaused) && (
-                        <button 
-                          onClick={stopReading} 
+                        <button
+                          onClick={stopReading}
                           className="flex items-center gap-2 rounded-md bg-red-500 hover:bg-red-600 text-white px-5 py-3 text-lg transition-colors"
                         >
                           <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -1258,7 +1434,7 @@ export default function StoryPage() {
                         </button>
                       )}
                     </div>
-                    
+
                     {/* Progress Bar */}
                     {tts.duration > 0 && (
                       <div className="w-full">
@@ -1267,14 +1443,14 @@ export default function StoryPage() {
                           <span>{Math.floor(tts.duration / 60)}:{Math.floor(tts.duration % 60).toString().padStart(2, '0')}</span>
                         </div>
                         <div className="w-full bg-white/30 rounded-full h-2">
-                          <div 
-                            className="bg-white h-2 rounded-full transition-all duration-300" 
+                          <div
+                            className="bg-white h-2 rounded-full transition-all duration-300"
                             style={{ width: `${tts.progress}%` }}
                           ></div>
                         </div>
                       </div>
                     )}
-                    
+
                     {/* Error Display */}
                     {tts.error && (
                       <div className="text-red-200 text-sm bg-red-500/20 rounded px-2 py-1">
@@ -1282,7 +1458,7 @@ export default function StoryPage() {
                       </div>
                     )}
                   </div>
-                  
+
                   <button onClick={next} disabled={idx === scenes.length - 1} className="w-full sm:w-auto rounded-md bg-indigo-600 text-white px-5 py-3 text-lg disabled:opacity-40 hover:bg-indigo-500">Next</button>
                 </div>
               </div>
@@ -1294,7 +1470,7 @@ export default function StoryPage() {
       )}
 
       {/* Jump detection component for jungle scene */}
-      <PoseDetection 
+      <PoseDetection
         isActive={jumpDetectionActive}
         onJumpDetected={handleJumpDetected}
       />
