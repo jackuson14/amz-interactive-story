@@ -45,8 +45,26 @@ export default function StoryPage() {
   const tts = useTTS({
     defaultVoice: 'Ivy', // Child-friendly default voice
     onEnd: () => {
-      if (speechSupported && !isListening) {
-        startListening();
+      // Auto-start voice recognition ONLY after TTS finishes AND if it's not a movement page
+      console.log('🔊 TTS finished - checking if should start listening', {
+        speechSupported,
+        isListening,
+        jumpDetectionActive,
+        currentPage: idx
+      });
+      
+      if (speechSupported && !isListening && !jumpDetectionActive && hasUserInteracted) {
+        console.log('✅ Starting voice recognition after TTS ended');
+        setTimeout(() => {
+          startListening();
+        }, 1000); // Small delay to ensure TTS cleanup is complete
+      } else {
+        console.log('❌ Not starting voice recognition:', {
+          reason: !speechSupported ? 'speech not supported' : 
+                  isListening ? 'already listening' : 
+                  jumpDetectionActive ? 'movement page active' : 
+                  !hasUserInteracted ? 'user has not interacted yet' : 'unknown'
+        });
       }
     }
   });
@@ -128,7 +146,11 @@ export default function StoryPage() {
 
   // The End page state
   const [showTheEnd, setShowTheEnd] = useState(false);
-
+  
+  // User interaction state for autoplay policy compliance
+  const [hasUserInteracted, setHasUserInteracted] = useState(false);
+  const [showStartButton, setShowStartButton] = useState(true);
+  
   // Navigation debouncing to prevent page skipping
   const navigationInProgress = useRef(false);
   const lastNavigationTime = useRef(0);
@@ -214,27 +236,38 @@ export default function StoryPage() {
   }, [hasCompletedFlow, prompt, customScenes, generateAIStory, setAiError]);
 
   // Load selected sample story via query param (client), with a default fallback
-  const [storyId, setStoryId] = useState(null);
-  useEffect(() => {
+  const [storyId, setStoryId] = useState(() => {
+    // Initialize storyId immediately to prevent fallback flash
     try {
-      const qs = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-      const id = qs ? qs.get('story') : null;
-      const prompt = qs ? qs.get('prompt') : null;
+      if (typeof window !== 'undefined') {
+        const qs = new URLSearchParams(window.location.search);
+        const id = qs.get('story');
+        const prompt = qs.get('prompt');
 
-      if (id) {
-        setStoryId(id);
-      } else if (prompt && prompt.includes("Lily's Lost Smile")) {
-        // If the prompt mentions Lily's Lost Smile, load that specific story
-        setStoryId("lily-lost-smile");
-      } else {
+        if (id) {
+          return id;
+        } else if (prompt && prompt.includes("Lily's Lost Smile")) {
+          return "lily-lost-smile";
+        }
+      }
+    } catch {}
+    return null; // Return null instead of random story to prevent flash
+  });
+
+  // Fallback to random story only if no URL params and no custom scenes
+  useEffect(() => {
+    if (!storyId && !customScenes && typeof window !== 'undefined') {
+      const qs = new URLSearchParams(window.location.search);
+      if (!qs.get('story') && !qs.get('prompt')) {
+        // Only set random story if there are truly no URL parameters
         const list = SAMPLE_STORIES;
         if (list?.length) {
           const rid = list[Math.floor(Math.random() * list.length)]?.id;
           if (rid) setStoryId(rid);
         }
       }
-    } catch {}
-  }, []);
+    }
+  }, [storyId, customScenes]);
 
   const storyTitle = useMemo(() => {
     // For The Lost Smile, just use the generic title
@@ -248,6 +281,11 @@ export default function StoryPage() {
 
   const baseScenes = useMemo(
     () => {
+      // Don't show any content until storyId is properly set
+      if (!storyId) {
+        return [];
+      }
+      
       const f = SAMPLE_STORIES.find((s) => s.id === storyId);
       if (f) {
         // If it's a markdown story and we have parsed content, use that
@@ -260,6 +298,7 @@ export default function StoryPage() {
         }
         return f.scenes;
       }
+      // Only fallback to first story if we have a storyId but can't find it
       const first = SAMPLE_STORIES[0];
       return first ? first.scenes : [];
     },
@@ -396,6 +435,7 @@ export default function StoryPage() {
     next();
   }, [next]);
 
+
   // Cleanup speech recognition when showing "The End" page
   useEffect(() => {
     if (showTheEnd && isListening) {
@@ -527,9 +567,8 @@ export default function StoryPage() {
         return;
       }
 
-      // Create story text with character name replacement
-      const storyText = `${current.title}. ${current.text}`;
-      const personalizedText = storyText.replace(/Lily/g, characterName);
+      // Create story text with character name replacement (title removed from UI, so don't include in speech)
+      const personalizedText = current.text.replace(/Lily/g, characterName);
 
       // Stop current audio and synthesize new speech
       const result = await tts.synthesizeAndPlay(personalizedText);
@@ -554,28 +593,56 @@ export default function StoryPage() {
       stopListening();
     }
   }, [tts, isListening, stopListening]);
-  // If playing, re-speak when scene changes
-  useEffect(() => {
-    if (tts.isPlaying) speakCurrent();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idx, scenes]);
 
-  // Auto-play when story loads or scene changes
-  useEffect(() => {
-    if (current && !tts.isPlaying && !tts.isPaused) {
-      // Stop any existing listening when scene changes
-      if (isListening) {
-        stopListening();
+  // Handle initial user interaction to enable autoplay
+  const handleStartStory = useCallback(async () => {
+    console.log('🎬 User started the story - enabling autoplay');
+    setHasUserInteracted(true);
+    setShowStartButton(false);
+    
+    // Start playing immediately after user interaction
+    if (current) {
+      try {
+        await speakCurrent();
+      } catch (error) {
+        console.error('Initial play failed:', error);
       }
-      // Small delay to ensure page is ready
+    }
+  }, [current, speakCurrent, setHasUserInteracted, setShowStartButton]);
+  // Auto-play when scene changes (idx changes) - only after user interaction
+  useEffect(() => {
+    if (!current || !hasUserInteracted) return;
+    
+    console.log('Scene changed, stopping current audio and starting new scene');
+    
+    // Always stop current audio when scene changes
+    tts.stop();
+    
+    // Stop any existing listening when scene changes
+    if (isListening) {
+      stopListening();
+    }
+    
+    // Small delay to ensure cleanup is complete, then start new audio
+    const timer = setTimeout(() => {
+      speakCurrent();
+    }, 300);
+    
+    return () => clearTimeout(timer);
+  }, [idx, hasUserInteracted]); // Only trigger when scene index changes AND user has interacted
+
+  // Initial auto-play when story first loads - only after user interaction
+  useEffect(() => {
+    if (current && idx === 0 && !tts.isPlaying && !tts.isPaused && hasUserInteracted) {
+      console.log('Initial story load, starting first scene audio');
+      // Small delay to ensure component is fully mounted
       const timer = setTimeout(() => {
         speakCurrent();
-      }, 500);
-
+      }, 1000);
+      
       return () => clearTimeout(timer);
     }
-  }, [current, isListening, tts.isPlaying, tts.isPaused, speakCurrent, stopListening, storyId]); // Trigger when current scene or story changes
-
+  }, [current, storyId, hasUserInteracted]); // Only trigger when story first loads AND user has interacted
 
   const startNewStory = useCallback(() => {
     try {
@@ -638,6 +705,27 @@ export default function StoryPage() {
 
   return (
     <main className="min-h-screen bg-white">
+      {/* Start Story Button Overlay */}
+      {showStartButton && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-white rounded-xl shadow-2xl p-8 max-w-md mx-4 text-center">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">🎬 Ready for Your Story?</h2>
+            <p className="text-gray-600 mb-6">
+              Click the button below to start your magical bedtime story with voice narration!
+            </p>
+            <button
+              onClick={handleStartStory}
+              className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold py-4 px-8 rounded-xl text-lg transition-all transform hover:scale-105 shadow-lg"
+            >
+              🌟 Start Story 🌟
+            </button>
+            <p className="text-xs text-gray-500 mt-4">
+              This enables audio playback for the story
+            </p>
+          </div>
+        </div>
+      )}
+
       {aiError && (
         <section className="px-6 sm:px-10 md:px-16 pt-4">
           <div className="mx-auto max-w-5xl">
@@ -697,7 +785,7 @@ export default function StoryPage() {
               {storyId === "goodnight-zoo" && (
                 <div className="flex items-end justify-center h-full pb-16">
                   <Image
-                    src={`/stories/zoo/char/boy${Math.min(idx + 1, 2)}.png`}
+                    src={`/stories/zoo/char/boy${idx < 3 ? 1 : 2}.png`}
                     alt="Main character"
                     width={300}
                     height={400}
@@ -712,7 +800,6 @@ export default function StoryPage() {
             <div className="w-1/2 flex flex-col justify-center p-8">
               {/* Story content */}
               <div className="text-white drop-shadow-lg">
-                <h2 className="text-3xl md:text-4xl font-extrabold mb-6 drop-shadow-lg">{current.title}</h2>
                 <p className="text-xl md:text-2xl leading-relaxed mb-4 drop-shadow-lg">{current.text}</p>
 
                 {/* Special jump instruction for jungle scene */}
@@ -775,7 +862,21 @@ export default function StoryPage() {
                           🎤 Voice Commands:
                         </p>
                         {(() => {
+                          if (!hasUserInteracted) {
+                            return (
+                              <p className="text-xs text-gray-600">
+                                🎬 Click &quot;Start Story&quot; to begin audio and voice commands
+                              </p>
+                            );
+                          }
                           const expectedKeyword = getPageSpeechKeyword(current?.text);
+                          if (tts.isPlaying) {
+                            return (
+                              <p className="text-xs text-orange-600">
+                                🔊 Reading story... Voice recognition will start when finished.
+                              </p>
+                            );
+                          }
                           return (
                             <p className="text-xs text-blue-600">
                               {expectedKeyword ?
@@ -979,9 +1080,8 @@ export default function StoryPage() {
               {/* Right: Big readable text */}
               <div className="flex flex-col justify-between">
                 <div>
-                  <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900">{current.title}</h2>
-                  <p className="mt-4 text-lg md:text-xl leading-relaxed text-gray-800">{current.text}</p>
-
+                  <p className="text-lg md:text-xl leading-relaxed text-gray-800">{current.text}</p>
+                  
                   {/* Special jump instruction for jungle scene */}
                   {jumpDetectionActive && (
                     <div className="mt-4 p-4 bg-green-100 border-2 border-green-300 rounded-lg">
@@ -1041,7 +1141,21 @@ export default function StoryPage() {
                           🎤 Voice Commands:
                         </p>
                         {(() => {
+                          if (!hasUserInteracted) {
+                            return (
+                              <p className="text-xs text-gray-600">
+                                🎬 Click &quot;Start Story&rdquo; to begin audio and voice commands
+                              </p>
+                            );
+                          }
                           const expectedKeyword = getPageSpeechKeyword(current?.text);
+                          if (tts.isPlaying) {
+                            return (
+                              <p className="text-xs text-orange-600">
+                                🔊 Reading story... Voice recognition will start when finished.
+                              </p>
+                            );
+                          }
                           return (
                             <p className="text-xs text-blue-600">
                               {expectedKeyword ?
