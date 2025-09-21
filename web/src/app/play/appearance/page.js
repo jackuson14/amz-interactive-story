@@ -68,8 +68,8 @@ const getAvailableCharacterImages = (age, gender) => {
       name: `Character ${num}`
     }));
   } else if (age === "5" || age === "6") {
-    // For 5-6yo: Female-Artboard 8,10,12 and Male-Artboard 7,9,11  
-    const artboardNumbers = gender === "girl" ? [8, 10, 12] : [7, 9, 11];
+    // For 5-6yo: Female-Artboard 8,10,12 and Male-Artboard 11,7,9 (11 moved to first position)  
+    const artboardNumbers = gender === "girl" ? [8, 10, 12] : [11, 7, 9];
     return artboardNumbers.map(num => ({
       id: `${genderPrefix}-${num}`,
       path: `/images/5-6yo/${genderPrefix}-Artboard ${num}.jpg`,
