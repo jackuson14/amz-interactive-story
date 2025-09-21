@@ -33,6 +33,7 @@ export default function StoryPage() {
   // Custom story and chat state
   const [customScenes, setCustomScenes] = useState(null);
   const [markdownStory, setMarkdownStory] = useState(null);
+  const [markdownLoadError, setMarkdownLoadError] = useState(null);
 
   const [messages, setMessages] = useState([]); // {role:'user'|'assistant', text:string}
   const [prompt, setPrompt] = useState("");
@@ -364,13 +365,33 @@ export default function StoryPage() {
           const cacheBuster = Date.now();
           const response = await fetch(`${story.markdownPath}?v=${cacheBuster}`);
           console.log('Fetch response status:', response.status);
+          
+          if (!response.ok) {
+            throw new Error(`Failed to load story: ${response.status} ${response.statusText}`);
+          }
+          
           const markdownContent = await response.text();
           console.log('Markdown content length:', markdownContent.length);
+          
+          if (!markdownContent || markdownContent.length === 0) {
+            throw new Error('Story content is empty');
+          }
+          
           const parsedStory = parseMarkdownStory(markdownContent, characterName, characterGender);
           console.log('Parsed story:', parsedStory);
+          
+          if (!parsedStory || !parsedStory.scenes || parsedStory.scenes.length === 0) {
+            throw new Error('Failed to parse story content');
+          }
+          
           setMarkdownStory(parsedStory);
+          setMarkdownLoadError(null); // Clear any previous errors
         } catch (error) {
           console.error('Failed to load markdown story:', error);
+          // Fallback to default scenes if markdown loading fails
+          console.log('Using fallback scenes from story configuration');
+          setMarkdownStory(null); // This will cause baseScenes to use story.scenes instead
+          setMarkdownLoadError('Story loading failed. Using backup version.');
         }
       } else {
         console.log('Not a markdown story or no path');
@@ -823,11 +844,11 @@ export default function StoryPage() {
         </div>
       )}
 
-      {aiError && (
+      {(aiError || markdownLoadError) && (
         <section className="px-6 sm:px-10 md:px-16 pt-4">
           <div className="mx-auto max-w-5xl">
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-              {aiError}
+            <div className={`${markdownLoadError ? 'bg-yellow-50 border-yellow-200 text-yellow-700' : 'bg-red-50 border-red-200 text-red-700'} border px-4 py-3 rounded`}>
+              {aiError || markdownLoadError}
             </div>
           </div>
         </section>
@@ -852,76 +873,61 @@ export default function StoryPage() {
           </div>
         </section>
       ) : current.bg && current.bg.startsWith('/') ? (
-        // Full-screen background image layout (no padding, no container)
-        <section className="relative h-screen">
-          {/* Background image */}
-          <Image
-            src={current.bg}
-            alt={current.title}
-            fill
-            className="object-cover"
-            unoptimized
-          />
-
-          {/* Back button - top left corner */}
-          <div className="absolute top-6 left-6 z-20">
-            <Link
-              href="/play"
-              className="w-12 h-12 bg-white/90 hover:bg-white backdrop-blur-sm rounded-full shadow-lg flex items-center justify-center text-gray-700 hover:text-gray-900 transition-all transform hover:scale-105"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </Link>
+        // Storybook layout with background image on left, text on right
+        <section className="h-screen flex">
+          {/* Left side - Full background image */}
+          <div className="w-1/2 relative">
+            <Image
+              src={current.bg}
+              alt={current.title}
+              fill
+              className="object-cover"
+              unoptimized
+            />
+            
+            {/* Back button - top left corner */}
+            <div className="absolute top-6 left-6 z-20">
+              <Link
+                href="/play/idea"
+                className="w-12 h-12 bg-white/90 hover:bg-white backdrop-blur-sm rounded-full shadow-lg flex items-center justify-center text-gray-700 hover:text-gray-900 transition-all transform hover:scale-105"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </Link>
+            </div>
           </div>
 
-          {/* Content overlay */}
-          <div className="relative z-10 h-full flex">
-            {/* Left side - character */}
-            <div className="w-1/2 flex items-center justify-center p-8">
-              {storyId === "goodnight-zoo" && (
-                <div className="flex items-end justify-center h-full pb-16">
-                  <Image
-                    src={`/stories/zoo/char/boy${idx < 3 ? 1 : 2}.png`}
-                    alt="Main character"
-                    width={300}
-                    height={400}
-                    className="drop-shadow-2xl"
-                    unoptimized
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Right side - text content */}
-            <div className="w-1/2 flex flex-col justify-center p-8">
+          {/* Right side - text content */}
+          <div className="w-1/2 bg-gradient-to-br from-purple-50 to-pink-50 flex flex-col justify-center p-12 overflow-y-auto">
               {/* Story content */}
-              <div className="text-white drop-shadow-lg">
-                <p className="text-xl md:text-2xl leading-relaxed mb-4 drop-shadow-lg">{current.text}</p>
+              <div className="max-w-xl mx-auto">
+                <h2 className="text-3xl font-bold text-gray-800 mb-6">{current.title || 'Story Time'}</h2>
+                <p className="text-xl leading-relaxed mb-6 text-gray-700">{current.text}</p>
 
 
                 {(() => {
                   const kw = getExpectedKeyword();
                   return kw ? (
-                    <div className="mb-4 p-4 bg-white/20 backdrop-blur-sm rounded-lg border-2 border-white/40">
-                      <p className="text-white text-lg font-bold text-center drop-shadow-lg">Say &quot;{kw}&quot; to go to the next page</p>
+                    <div className="mb-4 p-4 bg-blue-100 rounded-lg border-2 border-blue-300">
+                      <p className="text-blue-800 text-lg font-bold text-center">Say &quot;{kw}&quot; to go to the next page</p>
                     </div>
                   ) : null;
                 })()}
 
                 {/* Final scene jump instruction */}
                 {jumpDetectionActive && (
-                  <div className="mb-4 p-4 bg-green-500/90 backdrop-blur-sm rounded-lg border-2 border-green-300">
-                    <p className="text-white text-lg font-bold text-center drop-shadow-lg">
+                  <div className="mb-4 p-4 bg-green-100 rounded-lg border-2 border-green-300">
+                    <p className="text-green-800 text-lg font-bold text-center">
                       🎉 Jump to finish the story! 🎉
                     </p>
-                    <p className="text-white/90 text-sm text-center mt-1">
+                    <p className="text-green-700 text-sm text-center mt-1">
                       Stand back from your camera so we can see you, then jump!
                     </p>
 
 	                    {/* Voice navigation toggle */}
 	                    <div className="mb-2 flex items-center gap-2">
-	                      <label className="text-sm font-medium text-white drop-shadow-lg">Voice navigation</label>
+	                      <label className="text-sm font-medium text-gray-700">Voice navigation</label>
 	                      <input
 	                        type="checkbox"
 	                        checked={voiceNavEnabled}
@@ -934,7 +940,7 @@ export default function StoryPage() {
 	                        className="rounded"
 	                      />
 	                      {isListening && (
-	                        <span className="ml-2 text-xs text-white/90 drop-shadow-lg">Listening...</span>
+	                        <span className="ml-2 text-xs text-gray-600">Listening...</span>
 	                      )}
 	                    </div>
 
@@ -943,7 +949,7 @@ export default function StoryPage() {
 
                 {/* Navigation buttons */}
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                  <button onClick={prev} disabled={idx === 0} className="w-full sm:w-auto rounded-md bg-white/90 border border-gray-300 px-5 py-3 text-lg text-gray-700 disabled:opacity-40 hover:bg-white">Previous</button>
+                  <button onClick={prev} disabled={idx === 0} className="w-full sm:w-auto rounded-md bg-white border border-gray-300 px-5 py-3 text-lg text-gray-700 disabled:opacity-40 hover:bg-gray-50">Previous</button>
 
                   {/* Voice recognition controls - disabled on jungle scene */}
                   {speechSupported && !jumpDetectionActive && (
@@ -1152,62 +1158,58 @@ export default function StoryPage() {
                 </div>
               </div>
             </div>
-          </div>
         </section>
       ) : (
-        // Original layout for non-background-image stories
-        <>
-          <section className="px-6 sm:px-10 md:px-16 py-6 border-b bg-gradient-to-b from-white to-gray-50 flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Your Story</h1>
-              <p className="text-gray-600 text-sm">Sample: {storyTitle}</p>
+        // Storybook layout for regular stories
+        <section className="h-screen flex">
+          {/* Left side - Full image or gradient */}
+          <div className="w-1/2 relative">
+            {current.image ? (
+              // Story has an image - show it full size
+              <Image
+                src={current.image}
+                alt={current.title}
+                fill
+                className="object-cover"
+                unoptimized
+              />
+            ) : (
+              // No story image - use gradient with decorative elements
+              <div className={`h-full bg-gradient-to-br ${current.bg} relative`}>
+                <div className="absolute inset-0 opacity-40">
+                  <div className="w-48 h-48 rounded-full bg-white/60 blur-2xl absolute -top-10 -left-10" />
+                  <div className="w-56 h-56 rounded-full bg-white/40 blur-2xl absolute bottom-0 right-0" />
+                </div>
+              </div>
+            )}
+            
+            {/* Back button - top left corner */}
+            <div className="absolute top-6 left-6 z-20">
+              <Link
+                href="/play/idea"
+                className="w-12 h-12 bg-white/90 hover:bg-white backdrop-blur-sm rounded-full shadow-lg flex items-center justify-center text-gray-700 hover:text-gray-900 transition-all transform hover:scale-105"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </Link>
             </div>
-            <div className="flex gap-2">
-              <Link href="/play" className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100">Back</Link>
-              <button href="/play" className="rounded-md bg-indigo-600 text-white px-3 py-2 text-sm hover:bg-indigo-500">New story</button>
-            </div>
-          </section>
-          <section className="px-6 sm:px-10 md:px-16 py-8">
-          <div className="mx-auto max-w-5xl">
+          </div>
+
+          {/* Right side - text content */}
+          <div className="w-1/2 bg-gradient-to-br from-purple-50 to-pink-50 flex flex-col justify-center p-12 overflow-y-auto">
             {isLoadingMarkdown ? (
-              <div className="flex items-center justify-center py-20">
+              <div className="flex items-center justify-center">
                 <div className="text-gray-600">Loading story...</div>
               </div>
             ) : scenes.length === 0 ? (
-              <div className="flex items-center justify-center py-20">
+              <div className="flex items-center justify-center">
                 <div className="text-gray-600">No story content available</div>
               </div>
             ) : (
-            // Original grid layout for gradient backgrounds
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
-              {/* Left: Visual */}
-              <div className={`relative overflow-hidden rounded-xl border bg-gradient-to-br ${current.bg} min-h-[260px] md:min-h-[360px]`}>
-                {current.image ? (
-                  // Story has an image - show it as the main visual
-                  <div className="relative h-full">
-                    <Image
-                      src={current.image}
-                      alt={current.title}
-                      fill
-                      className="object-cover rounded-xl"
-                      unoptimized
-                    />
-                  </div>
-                ) : (
-                  // No story image - use original gradient design
-                  <>
-                    <div className="absolute inset-0 opacity-40">
-                      <div className="w-48 h-48 rounded-full bg-white/60 blur-2xl absolute -top-10 -left-10" />
-                      <div className="w-56 h-56 rounded-full bg-white/40 blur-2xl absolute bottom-0 right-0" />
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* Right: Big readable text */}
-              <div className="flex flex-col justify-between">
-                <div>
-                  <p className="text-lg md:text-xl leading-relaxed text-gray-800">{current.text}</p>
+              <div className="max-w-xl mx-auto">
+                <h2 className="text-3xl font-bold text-gray-800 mb-6">{current.title || storyTitle}</h2>
+                <p className="text-xl leading-relaxed mb-6 text-gray-700">{current.text}</p>
 
                   {(() => {
                     const kw = getExpectedKeyword();
@@ -1232,7 +1234,7 @@ export default function StoryPage() {
                       </p>
                     </div>
                   )}
-                </div>
+
                 <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                   <button onClick={prev} disabled={idx === 0} className="w-full sm:w-auto rounded-md border border-gray-300 px-5 py-3 text-lg text-gray-700 disabled:opacity-40 hover:bg-gray-100">Previous</button>
 
@@ -1462,11 +1464,9 @@ export default function StoryPage() {
                   <button onClick={next} disabled={idx === scenes.length - 1} className="w-full sm:w-auto rounded-md bg-indigo-600 text-white px-5 py-3 text-lg disabled:opacity-40 hover:bg-indigo-500">Next</button>
                 </div>
               </div>
-            </div>
             )}
           </div>
         </section>
-        </>
       )}
 
       {/* Jump detection component for jungle scene */}

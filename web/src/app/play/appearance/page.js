@@ -242,7 +242,7 @@ export default function PlayAppearancePage() {
         <div className="mx-auto max-w-full">
           <div className="grid grid-cols-1 lg:grid-cols-2">
             {/* Left side - Title */}
-            <div className="px-6 sm:px-12 md:px-16 lg:px-32 py-10 lg:py-20 lg:min-h-screen flex flex-col" style={{backgroundColor: '#3b2986'}}>
+            <div className="px-6 sm:px-12 md:px-16 lg:px-32 py-10 lg:py-20 lg:h-screen lg:sticky lg:top-0 flex flex-col" style={{backgroundColor: '#3b2986'}}>
               <Link href="/play/character" className="inline-flex items-center text-white hover:text-gray-200 transition-all hover:scale-105 mb-4 lg:mb-8">
                 <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" />
