@@ -169,8 +169,8 @@ function getBackgroundForPage(pageNumber) {
 
 function getZooBackground(pageNumber) {
   // Return the URL for the zoo background image
-  // Handle inconsistent naming: page1.jpg vs Page2.jpg, etc.
-  const filename = pageNumber === 1 ? 'page1.jpg' : `Page${pageNumber}.jpg`;
+  // Updated to match actual filenames: Page_1.png, Page_2.png, etc.
+  const filename = `Page_${pageNumber}.png`;
 
   return `/stories/zoo/bg/${filename}`;
 }
