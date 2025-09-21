@@ -598,18 +598,6 @@ const PoseDetection = ({ onJumpDetected, onHandsUpDetected, isActive = false, de
           </div>
         )}
         
-        {/* Debug Status Panel */}
-        <div className="bg-gray-100 p-2 rounded text-xs mb-2">
-          <div className="font-bold mb-1">🔧 Debug Status:</div>
-          <div className="text-blue-600">Init: {initStatus}</div>
-          <div className="text-green-600">Camera: {cameraStatus || 'Not started'}</div>
-          <div className="text-purple-600">Pose: {poseStatus || 'Not started'}</div>
-          <div className="text-gray-600">Active: {isActive ? 'YES' : 'NO'}</div>
-          <div className="text-gray-600">Loading: {isLoading ? 'YES' : 'NO'}</div>
-          <div className="text-gray-600">Detecting: {isDetecting ? 'YES' : 'NO'}</div>
-          <div className="text-gray-600">Frames: {detectionCounter.current}</div>
-        </div>
-        
         {jumpStatus && (
           <div className="text-green-600 text-sm mb-2 font-medium p-2 bg-green-100 rounded">
             {jumpStatus}

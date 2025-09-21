@@ -12,16 +12,17 @@ export const useTTS = (options = {}) => {
   const [availableVoices, setAvailableVoices] = useState([]);
   const [selectedVoice, setSelectedVoice] = useState(options.defaultVoice || 'Ivy');
   const [naturalSpeech, setNaturalSpeech] = useState(true); // Enable natural speech by default
-  
+
   const audioRef = useRef(null);
   const progressInterval = useRef(null);
   const progressUpdateRef = useRef(null);
+  const isStoppingRef = useRef(false);
+
+  const synthRequestIdRef = useRef(0);
+
   const [volume, setVolumeState] = useState(0.9); // Default to 90% volume (louder)
 
-  // Load available voices on mount
-  useEffect(() => {
-    loadVoices();
-  }, []);
+
 
   // Cleanup on unmount
   useEffect(() => {
@@ -39,14 +40,14 @@ export const useTTS = (options = {}) => {
     };
   }, []);
 
-  const loadVoices = async () => {
+  const loadVoices = useCallback(async () => {
     try {
       const response = await fetch('/api/tts?language=en-US');
       const data = await response.json();
-      
+
       if (data.success) {
         setAvailableVoices(data.voices);
-        
+
         // Set recommended voice as default if current selection isn't available
         const recommendedVoice = data.voices.find(v => v.isRecommended);
         if (recommendedVoice && !data.voices.find(v => v.Id === selectedVoice)) {
@@ -57,16 +58,27 @@ export const useTTS = (options = {}) => {
       console.error('Failed to load voices:', error);
       setError('Failed to load voice options');
     }
-  };
+  }, [selectedVoice]);
+
+  // Load available voices on mount
+  useEffect(() => {
+    loadVoices();
+  }, [loadVoices]);
+
 
   const synthesizeAndPlay = async (text, voice = null) => {
     stop(); // Stop any currently playing audio first.
+    const requestId = ++synthRequestIdRef.current;
+
+
+
+
     try {
       setIsLoading(true);
       setError(null);
 
       const voiceToUse = voice || selectedVoice;
-      
+
       console.log('Synthesizing text:', { text: text.substring(0, 50) + '...', voice: voiceToUse });
 
       const response = await fetch('/api/tts', {
@@ -89,6 +101,12 @@ export const useTTS = (options = {}) => {
 
       const data = await response.json();
 
+      // If a newer request started, abort this one silently
+      if (requestId !== synthRequestIdRef.current) {
+        return { success: false, error: 'cancelled' };
+      }
+
+
       if (!data.success) {
         throw new Error(data.error || 'Failed to synthesize speech');
       }
@@ -98,13 +116,13 @@ export const useTTS = (options = {}) => {
         [Uint8Array.from(atob(data.audio), c => c.charCodeAt(0))],
         { type: 'audio/mpeg' }
       );
-      
+
       const audioUrl = URL.createObjectURL(audioBlob);
 
       // Create new audio element
       const audio = new Audio(audioUrl);
       audioRef.current = audio;
-      
+
       // Set higher default volume
       audio.volume = volume;
 
@@ -137,10 +155,16 @@ export const useTTS = (options = {}) => {
       });
 
       audio.addEventListener('error', (e) => {
-        // Only log meaningful audio errors, not empty objects
-        if (e.target && e.target.error) {
-          console.error('Audio playback error:', e.target.error);
-          setError(`Audio error: ${e.target.error.message || 'Playback failed'}`);
+        const target = e.target;
+        const pageUrl = typeof window !== 'undefined' ? window.location.href : '';
+        const emptySrc = target && (!target.src || target.src === '' || target.src === pageUrl);
+        // Suppress non-actionable error when we intentionally cleared the src on stop
+        if (isStoppingRef.current && emptySrc) {
+          return;
+        }
+        if (target && target.error) {
+          console.error('Audio playback error:', target.error);
+          setError(`Audio error: ${target.error.message || 'Playback failed'}`);
         } else {
           console.warn('Audio error (no details available)');
           // Don't show generic error to user as it's usually not actionable
@@ -156,8 +180,15 @@ export const useTTS = (options = {}) => {
           setIsPlaying(true);
           setIsPaused(false);
         }).catch(error => {
-          console.error("Audio playback failed", error);
-          setError('Audio playback failed');
+          // Suppress benign interruption errors (e.g., play() interrupted by pause())
+          const msg = (error && (error.name || error.message)) || '';
+          const interrupted = typeof msg === 'string' && msg.toLowerCase().includes('interrupted');
+          if (isStoppingRef.current || interrupted) {
+            console.debug('Audio play() was interrupted (benign).');
+          } else {
+            console.error('Audio playback failed', error);
+            setError('Audio playback failed');
+          }
           setIsPlaying(false);
           setIsPaused(false);
         });
@@ -199,18 +230,36 @@ export const useTTS = (options = {}) => {
   }, [isPlaying]);
 
   const stop = useCallback(() => {
+    // Invalidate any in-flight synthesis so it won't auto-play
+    synthRequestIdRef.current++;
+
     if (progressInterval.current) {
       clearInterval(progressInterval.current);
       progressInterval.current = null;
     }
     if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.src = ''; // Detach the source
-      audioRef.current.load(); // aborts the download and resets the element
-      audioRef.current = null;
+      isStoppingRef.current = true;
+      const audio = audioRef.current;
+      try {
+        audio.pause();
+        // Avoid triggering MEDIA_ELEMENT_ERROR when clearing src
+        if (audio.src) {
+          try {
+            audio.removeAttribute('src');
+            audio.load();
+          } catch (_) {
+            // ignore
+          }
+        }
+      } finally {
+        audioRef.current = null;
+        // Reset suppression on next tick
+        setTimeout(() => { isStoppingRef.current = false; }, 0);
+      }
     }
     setIsPlaying(false);
     setIsPaused(false);
+    setIsLoading(false);
     setProgress(0);
     setDuration(0);
   }, []);
@@ -249,7 +298,7 @@ export const useTTS = (options = {}) => {
     selectedVoice,
     volume,
     naturalSpeech,
-    
+
     // Actions
     synthesizeAndPlay,
     play,
@@ -261,7 +310,7 @@ export const useTTS = (options = {}) => {
     setSelectedVoice,
     setNaturalSpeech,
     loadVoices,
-    
+
     // Computed
     isReady: !isLoading && !error,
     canPlay: !isLoading && isPaused,

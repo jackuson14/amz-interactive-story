@@ -33,10 +33,10 @@ export const useTranscribe = (options = {}) => {
         // Check if required APIs are available
         const hasMediaDevices = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
         const hasAudioContext = !!(window.AudioContext || window.webkitAudioContext);
-        
+
         if (hasMediaDevices && hasAudioContext) {
           setIsSupported(true);
-          
+
           // Test microphone permission
           try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -77,16 +77,16 @@ export const useTranscribe = (options = {}) => {
     initializationPromiseRef.current = (async () => {
       try {
         const service = new TranscribeService();
-        
+
         // Set up event handlers
         service.setOnTranscript((result) => {
           setTranscript(result.transcript);
           setConfidence(result.confidence);
-          
+
           if (onTranscript) {
             onTranscript(result);
           }
-          
+
           if (result.isFinal && onFinalTranscript) {
             onFinalTranscript(result);
           }
@@ -96,7 +96,7 @@ export const useTranscribe = (options = {}) => {
           console.error('Transcription error:', error);
           setError(error.message || 'Transcription failed');
           setIsListening(false);
-          
+
           if (onErrorCallback) {
             onErrorCallback(error);
           }
@@ -104,17 +104,11 @@ export const useTranscribe = (options = {}) => {
 
         service.setOnEnd(() => {
           setIsListening(false);
-          
           if (onEnd) {
             onEnd();
           }
           
-          // Auto-restart if enabled and no error
-          if (autoRestart && !error) {
-            setTimeout(() => {
-              startListening();
-            }, 1000);
-          }
+
         });
 
         const success = await service.initialize();
@@ -136,7 +130,7 @@ export const useTranscribe = (options = {}) => {
     })();
 
     return initializationPromiseRef.current;
-  }, [isSupported, onTranscript, onFinalTranscript, onErrorCallback, onEnd, autoRestart, error]);
+  }, [isSupported, onTranscript, onFinalTranscript, onErrorCallback, onEnd]);
 
   // Start listening
   const startListening = useCallback(async () => {
@@ -146,7 +140,7 @@ export const useTranscribe = (options = {}) => {
 
     try {
       setError(null);
-      
+
       const service = await initializeService();
       if (!service) {
         throw new Error('Failed to initialize transcription service');
@@ -162,7 +156,9 @@ export const useTranscribe = (options = {}) => {
         setConfidence(0);
         return true;
       } else {
-        throw new Error('Failed to start transcription');
+        setError('Failed to start transcription');
+        setIsListening(false);
+        return false;
       }
     } catch (error) {
       console.error('Failed to start listening:', error);
@@ -196,6 +192,45 @@ export const useTranscribe = (options = {}) => {
       await startListening();
     }
   }, [isListening, startListening, stopListening]);
+
+  // Keep service handlers up-to-date with latest callbacks
+  useEffect(() => {
+    const service = transcribeServiceRef.current;
+    if (!service) return;
+
+    service.setOnTranscript((result) => {
+      setTranscript(result.transcript);
+      setConfidence(result.confidence);
+      if (onTranscript) {
+        onTranscript(result);
+      }
+      if (result.isFinal && onFinalTranscript) {
+        onFinalTranscript(result);
+      }
+    });
+
+    service.setOnError((error) => {
+      console.error('Transcription error:', error);
+      setError(error.message || 'Transcription failed');
+      setIsListening(false);
+      if (onErrorCallback) {
+        onErrorCallback(error);
+      }
+    });
+
+    service.setOnEnd(() => {
+      setIsListening(false);
+      if (onEnd) {
+        onEnd();
+      }
+      if (autoRestart && !error) {
+        setTimeout(() => {
+          startListening();
+        }, 1000);
+      }
+    });
+  }, [onTranscript, onFinalTranscript, onErrorCallback, onEnd, autoRestart, error, startListening]);
+
 
   // Request microphone permission
   const requestPermission = useCallback(async () => {
@@ -238,14 +273,14 @@ export const useTranscribe = (options = {}) => {
     confidence,
     error,
     permissionGranted,
-    
+
     // Actions
     startListening,
     stopListening,
     toggleListening,
     requestPermission,
     clearTranscript,
-    
+
     // Computed
     isReady: isSupported && permissionGranted && !isInitializing,
     hasHighConfidence: confidence >= confidenceThreshold,

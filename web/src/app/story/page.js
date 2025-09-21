@@ -51,12 +51,12 @@ export default function StoryPage() {
       // Auto-start voice recognition ONLY after TTS finishes AND if it's not a movement page
       console.log('🔊 TTS finished - checking if should start listening', {
         speechSupported,
-        isListening,
+        isListening: transcribe.isListening,
         jumpDetectionActive,
         currentPage: idx
       });
 
-      if (speechSupported && !isListening && !jumpDetectionActive && hasUserInteracted && voiceNavEnabled) {
+      if (speechSupported && !transcribe.isListening && !jumpDetectionActive && hasUserInteracted && voiceNavEnabled) {
         console.log('✅ Starting voice recognition after TTS ended');
         setTimeout(() => {
           startListening();
@@ -64,7 +64,7 @@ export default function StoryPage() {
       } else {
         console.log('❌ Not starting voice recognition:', {
           reason: !speechSupported ? 'speech not supported' :
-                  isListening ? 'already listening' :
+                  transcribe.isListening ? 'already listening' :
                   jumpDetectionActive ? 'movement page active' :
                   !hasUserInteracted ? 'user has not interacted yet' : 'unknown'
         });
@@ -73,10 +73,10 @@ export default function StoryPage() {
   });
 
   // Voice recognition state
-  const [isListening, setIsListening] = useState(false);
+
   const [speechSupported, setSpeechSupported] = useState(false);
   const [recognizedText, setRecognizedText] = useState("");
-  const [voiceError, setVoiceError] = useState("");
+  const [, setVoiceError] = useState("");
 
 
   // Amazon Transcribe hook for speech-to-text
@@ -91,6 +91,7 @@ export default function StoryPage() {
       const transcript = result.transcript || '';
       const lowerTranscript = transcript.toLowerCase().trim();
       const expectedKeyword = getExpectedKeyword();
+      console.log(expectedKeyword);
 
       console.log('\ud83c\udfa4 Transcribe final result:', {
         transcript,
@@ -496,7 +497,6 @@ export default function StoryPage() {
     } catch (error) {
       console.warn('Error stopping transcription:', error);
     }
-    setIsListening(false);
     setRecognizedText('');
   }, [transcribe]);
 
@@ -511,11 +511,11 @@ export default function StoryPage() {
     setJumpDetectionActive(shouldActivateJumpDetection);
 
     // Stop voice recognition when jump detection activates
-    if (shouldActivateJumpDetection && isListening) {
+    if (shouldActivateJumpDetection && transcribe.isListening) {
       console.log('Stopping voice recognition for jump detection');
       stopListening();
     }
-  }, [storyId, idx, scenes.length, isListening, stopListening]);
+  }, [storyId, idx, scenes.length, transcribe.isListening, stopListening]);
 
   // Handle jump detection
   const handleJumpDetected = useCallback(() => {
@@ -531,22 +531,18 @@ export default function StoryPage() {
 
   // Cleanup speech recognition when showing "The End" page
   useEffect(() => {
-    if (showTheEnd && isListening) {
+    if (showTheEnd && transcribe.isListening) {
       console.log('🌙 Stopping speech recognition for The End page');
       stopListening();
     }
-  }, [showTheEnd, isListening, stopListening]);
+  }, [showTheEnd, transcribe.isListening, stopListening]);
 
   // Amazon Transcribe: sync support/listening status with UI state
   useEffect(() => {
     setSpeechSupported(transcribe.isSupported);
   }, [transcribe.isSupported]);
 
-  useEffect(() => {
-    if (isListening !== transcribe.isListening) {
-      setIsListening(transcribe.isListening);
-    }
-  }, [transcribe.isListening, isListening]);
+
 
   useEffect(() => {
     if (transcribe.error) {
@@ -580,15 +576,12 @@ export default function StoryPage() {
 
       const ok = await transcribe.startListening();
       if (ok) {
-        setIsListening(true);
         console.log('✅ Transcription started successfully');
       } else {
-        setIsListening(false);
         setVoiceError('Failed to start voice recognition');
       }
     } catch (error) {
       console.error('❌ Failed to start transcription:', error);
-      setIsListening(false);
       setVoiceError('Failed to start voice recognition');
     }
   }, [transcribe, idx]);
@@ -693,10 +686,10 @@ export default function StoryPage() {
   const stopReading = useCallback(() => {
     tts.stop();
     // Stop listening when read-aloud is manually stopped
-    if (isListening) {
+    if (transcribe.isListening) {
       stopListening();
     }
-  }, [tts, isListening, stopListening]);
+  }, [tts, transcribe.isListening, stopListening]);
 
   // Handle initial user interaction to enable autoplay
   const handleStartStory = useCallback(async () => {
@@ -723,7 +716,7 @@ export default function StoryPage() {
     tts.stop();
 
     // Stop any existing listening when scene changes
-    if (isListening) {
+    if (transcribe.isListening) {
       stopListening();
     }
 
@@ -733,6 +726,9 @@ export default function StoryPage() {
     }, 300);
 
     return () => clearTimeout(timer);
+    // We intentionally only trigger on scene index and user interaction to avoid
+    // loops when listening state toggles. The values referenced are stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idx, hasUserInteracted]); // Only trigger when scene index changes AND user has interacted
 
   // Initial auto-play when story first loads - only after user interaction
@@ -962,13 +958,13 @@ export default function StoryPage() {
 	                        checked={voiceNavEnabled}
 	                        onChange={(e) => {
 	                          setVoiceNavEnabled(e.target.checked);
-	                          if (!e.target.checked && isListening) {
+	                          if (!e.target.checked && transcribe.isListening) {
 	                            stopListening();
 	                          }
 	                        }}
 	                        className="rounded"
 	                      />
-	                      {isListening && (
+	                      {transcribe.isListening && (
 	                        <span className="ml-2 text-xs text-gray-600">Listening...</span>
 	                      )}
 	                    </div>
@@ -983,8 +979,9 @@ export default function StoryPage() {
                   {/* Voice recognition controls - disabled on jungle scene */}
                   {speechSupported && !jumpDetectionActive && (
                     <div className="w-full">
-                      {!isListening ? (
+                      {!transcribe.isListening ? (
                         <button
+                          type="button"
                           onClick={startListening}
                           className="flex items-center justify-center gap-2 rounded-md bg-purple-500 hover:bg-purple-600 text-white px-5 py-3 text-lg transition-colors w-full sm:w-auto"
                         >
@@ -995,6 +992,7 @@ export default function StoryPage() {
                         </button>
                       ) : (
                         <button
+                          type="button"
                           onClick={stopListening}
                           className="flex items-center justify-center gap-2 rounded-md bg-red-500 hover:bg-red-600 text-white px-5 py-3 text-lg transition-colors animate-pulse w-full sm:w-auto"
                         >
@@ -1013,11 +1011,7 @@ export default function StoryPage() {
                         </div>
                       )}
 
-                      {voiceError && (
-                        <div className="mt-2 p-2 bg-white/90 rounded-lg border border-red-200">
-                          <p className="text-sm text-red-800">{voiceError}</p>
-                        </div>
-                      )}
+
                     </div>
                   )}
 
@@ -1027,14 +1021,15 @@ export default function StoryPage() {
                     {/* Play/Pause/Stop Controls */}
                     <div className="flex gap-2">
                       {tts.isLoading && (
-                        <div className="flex items-center gap-2 text-white">
-                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                          <span>Generating speech...</span>
+                        <div role="status" aria-live="polite" className="inline-flex items-center gap-3 rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white shadow-lg px-4 py-2 ring-1 ring-white/20">
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/60 border-t-transparent"></div>
+                          <span className="text-sm font-medium tracking-wide">Generating speech…</span>
                         </div>
                       )}
 
                       {!tts.isPlaying && !tts.isPaused && !tts.isLoading && (
                         <button
+                          type="button"
                           onClick={speakCurrent}
                           className="flex items-center gap-2 rounded-md bg-green-500 hover:bg-green-600 text-white px-5 py-3 text-lg transition-colors"
                         >
@@ -1047,6 +1042,7 @@ export default function StoryPage() {
 
                       {tts.isPlaying && (
                         <button
+                          type="button"
                           onClick={pauseReading}
                           className="flex items-center gap-2 rounded-md bg-yellow-500 hover:bg-yellow-600 text-white px-5 py-3 text-lg transition-colors"
                         >
@@ -1059,6 +1055,7 @@ export default function StoryPage() {
 
                       {tts.isPaused && (
                         <button
+                          type="button"
                           onClick={speakCurrent}
                           className="flex items-center gap-2 rounded-md bg-green-500 hover:bg-green-600 text-white px-5 py-3 text-lg transition-colors"
                         >
@@ -1071,6 +1068,7 @@ export default function StoryPage() {
 
                       {(tts.isPlaying || tts.isPaused) && (
                         <button
+                          type="button"
                           onClick={stopReading}
                           className="flex items-center gap-2 rounded-md bg-red-500 hover:bg-red-600 text-white px-5 py-3 text-lg transition-colors"
                         >
@@ -1082,12 +1080,7 @@ export default function StoryPage() {
                       )}
                     </div>
 
-                    {/* Error Display */}
-                    {tts.error && (
-                      <div className="text-red-200 text-sm bg-red-500/20 rounded px-2 py-1">
-                        {tts.error}
-                      </div>
-                    )}
+
                   </div>
 
                   <button onClick={next} disabled={idx === scenes.length - 1} className="w-full sm:w-auto rounded-md bg-indigo-600 text-white px-5 py-3 text-lg disabled:opacity-40 hover:bg-indigo-500">Next</button>
@@ -1176,7 +1169,7 @@ export default function StoryPage() {
                   {/* Voice recognition controls - disabled on jungle scene */}
                   {speechSupported && !jumpDetectionActive && (
                     <div className="w-full">
-                      {!isListening ? (
+                      {!transcribe.isListening ? (
                         <button
                           onClick={startListening}
                           className="flex items-center justify-center gap-2 rounded-md bg-purple-500 hover:bg-purple-600 text-white px-5 py-3 text-lg transition-colors w-full sm:w-auto"
@@ -1188,6 +1181,7 @@ export default function StoryPage() {
                         </button>
                       ) : (
                         <button
+                          type="button"
                           onClick={stopListening}
                           className="flex items-center justify-center gap-2 rounded-md bg-red-500 hover:bg-red-600 text-white px-5 py-3 text-lg transition-colors animate-pulse w-full sm:w-auto"
                         >
@@ -1203,13 +1197,13 @@ export default function StoryPage() {
 	                        checked={voiceNavEnabled}
 	                        onChange={(e) => {
 	                          setVoiceNavEnabled(e.target.checked);
-	                          if (!e.target.checked && isListening) {
+	                          if (!e.target.checked && transcribe.isListening) {
 	                            stopListening();
 	                          }
 	                        }}
 	                        className="rounded"
 	                      />
-	                      {isListening && (
+	                      {transcribe.isListening && (
 	                        <span className="ml-2 text-xs text-gray-600">Listening...</span>
 	                      )}
 	                    </div>
@@ -1226,11 +1220,7 @@ export default function StoryPage() {
                         </div>
                       )}
 
-                      {voiceError && (
-                        <div className="mt-2 p-2 bg-red-50 rounded-lg border border-red-200">
-                          <p className="text-sm text-red-800">{voiceError}</p>
-                        </div>
-                      )}
+
                     </div>
                   )}
 
@@ -1286,14 +1276,15 @@ export default function StoryPage() {
                     {/* Play/Pause/Stop Controls */}
                     <div className="flex gap-2">
                       {tts.isLoading && (
-                        <div className="flex items-center gap-2 text-white">
-                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                          <span>Generating speech...</span>
+                        <div role="status" aria-live="polite" className="inline-flex items-center gap-3 rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white shadow-lg px-4 py-2 ring-1 ring-white/20">
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/60 border-t-transparent"></div>
+                          <span className="text-sm font-medium tracking-wide">Generating speech…</span>
                         </div>
                       )}
 
                       {!tts.isPlaying && !tts.isPaused && !tts.isLoading && (
                         <button
+                          type="button"
                           onClick={speakCurrent}
                           className="flex items-center gap-2 rounded-md bg-green-500 hover:bg-green-600 text-white px-5 py-3 text-lg transition-colors"
                         >
@@ -1306,6 +1297,7 @@ export default function StoryPage() {
 
                       {tts.isPlaying && (
                         <button
+                          type="button"
                           onClick={pauseReading}
                           className="flex items-center gap-2 rounded-md bg-yellow-500 hover:bg-yellow-600 text-white px-5 py-3 text-lg transition-colors"
                         >
@@ -1318,6 +1310,7 @@ export default function StoryPage() {
 
                       {tts.isPaused && (
                         <button
+                          type="button"
                           onClick={speakCurrent}
                           className="flex items-center gap-2 rounded-md bg-green-500 hover:bg-green-600 text-white px-5 py-3 text-lg transition-colors"
                         >
@@ -1330,6 +1323,7 @@ export default function StoryPage() {
 
                       {(tts.isPlaying || tts.isPaused) && (
                         <button
+                          type="button"
                           onClick={stopReading}
                           className="flex items-center gap-2 rounded-md bg-red-500 hover:bg-red-600 text-white px-5 py-3 text-lg transition-colors"
                         >
@@ -1358,11 +1352,7 @@ export default function StoryPage() {
                     )}
 
                     {/* Error Display */}
-                    {tts.error && (
-                      <div className="text-red-200 text-sm bg-red-500/20 rounded px-2 py-1">
-                        {tts.error}
-                      </div>
-                    )}
+
                   </div>
 
                   <button onClick={next} disabled={idx === scenes.length - 1} className="w-full sm:w-auto rounded-md bg-indigo-600 text-white px-5 py-3 text-lg disabled:opacity-40 hover:bg-indigo-500">Next</button>
