@@ -33,26 +33,50 @@ const parseStoryIntoScenes = (generatedText, images) => {
   // Helpers to extract and clean voice keyword and script text
   const extractKeyword = (content) => {
     if (!content) return null;
-    const keyLine = content.match(/^(?:\s*)(?:Keyword|Voice\s*Keyword)\s*:\s*"?([^"\n]+)"?/im);
+    // Support variations and punctuation: colon/hyphen/en/em dash, straight/curly quotes, optional leading bullets
+    const keyLine = content.match(/^(?:\s*)[-*]?\s*(?:Keyword|Voice\s*Keyword)\s*[:\-\u2013\u2014]\s*["'\u201c\u2018]?([^"'\n\u201d\u2019]+)["'\u201d\u2019]?/im);
     if (keyLine) return keyLine[1].trim().toLowerCase();
-    const sayMatch = content.match(/Say\s+"([^"]+)"\s+to/i);
+    // Match Say "..." to ... (supports curly/straight quotes too)
+    const sayMatch = content.match(/Say\s+["'\u201c\u2018]([^"'\u201d\u2019]+)["'\u201d\u2019]\s+to/i);
     if (sayMatch) return sayMatch[1].trim().toLowerCase();
     return null;
   };
 
-  const cleanSceneText = (content) => {
-    if (!content) return '';
-    return content
-      // remove explicit Keyword or Instruction lines
-      .replace(/^(?:\s*)(?:Keyword|Voice\s*Keyword)\s*:[^\n]*$/gmi, '')
-      .replace(/^(?:\s*)(?:Instruction|Voice\s*Instruction)\s*:[^\n]*$/gmi, '')
-      // remove trailing Say "..." to ... guidance lines
-      .replace(/Say\s+"[^"]+"\s+to[^\n]*$/gmi, '')
-      .trim();
+  const extractInstruction = (content) => {
+    if (!content) return null;
+    // Prefer explicit Instruction line
+    const inst = content.match(/^(?:\s*)[-*]?\s*(?:Instruction|Voice\s*Instruction)\s*[:\-\u2013\u2014]\s*(.+)$/im);
+    if (inst) return inst[1].trim();
+    // Fallback: Say "keyword" to ... line
+    const say = content.match(/^(?:\s*)[-*]?\s*Say\s+["'\u201c\u2018]([^"'\u201d\u2019]+)["'\u201d\u2019]\s+to\s+(.+)$/im);
+    if (say) return `Say "${say[1].trim()}" to ${say[2].trim()}`;
+    return null;
   };
 
-  // Simple parsing - split by common scene indicators
-  const sceneTexts = generatedText.split(/(?:Scene\s+\d+|Chapter\s+\d+|^\d+\.)/im).filter(text => text.trim());
+  const cleanSceneText = (block) => {
+    if (!block) return '';
+    // Process line-by-line for robustness
+    const lines = String(block).split('\n');
+    const kept = [];
+    for (const raw of lines) {
+      let line = raw.trim();
+      if (!line) continue;
+      // Drop scene header lines entirely (allow :, -, en dash, em dash)
+      if (/^Scene\s+\d+\s*[:\-\u2013\u2014]/i.test(line)) continue;
+      // Drop keyword/instruction metadata (with optional leading bullets)
+      if (/^(?:[-*]\s*)?(?:Keyword|Voice\s*Keyword)\s*[:\-\u2013\u2014]/i.test(line)) continue;
+      if (/^(?:[-*]\s*)?(?:Instruction|Voice\s*Instruction)\s*[:\-\u2013\u2014]/i.test(line)) continue;
+      // Strip 'Script:' label but keep its content
+      line = line.replace(/^\s*Script\s*[:\-\u2013\u2014]\s*/i, '');
+      // Drop pure guidance 'Say "..." to ...' lines (supports bullets and curly/straight quotes)
+      if (/^(?:[-*]\s*)?Say\s+["'\u201c\u2018][^"'\u201d\u2019]+["'\u201d\u2019]\s+to/i.test(line)) continue;
+      kept.push(line);
+    }
+    return kept.join(' ').trim();
+  };
+
+  // Parse scene blocks by explicit "Scene N:" headers to preserve per-scene mapping
+  const sceneBlocks = generatedText.match(/(^|\n)Scene\s+\d+:[\s\S]*?(?=(?:\nScene\s+\d+:)|$)/gi) || [];
 
   // Create scenes in the format expected by the story page
   const scenes = [];
@@ -66,21 +90,47 @@ const parseStoryIntoScenes = (generatedText, images) => {
   ];
 
   // If we have structured text, use it; otherwise create default scenes
-  if (sceneTexts.length >= 6) {
-    sceneTexts.slice(0, 6).forEach((text, index) => {
-      const lines = text.trim().split('\n').filter(line => line.trim());
-      const title = lines[0]?.replace(/[*#]/g, '').trim() || `Scene ${index + 1}`;
-      const rawContent = lines.slice(1).join(' ').trim() || text.trim();
+  if (sceneBlocks.length >= 6) {
+    sceneBlocks.slice(0, 6).forEach((block, index) => {
+      // Title from header line
+      const header = block.match(/Scene\s+\d+\s*[:\-\u2013\u2014]\s*(.*)/i);
+      const titleHeader = header?.[1]?.trim() || '';
+
+      // Normalize and split into lines for fallback handling
+      const normalized = block.trim();
+      const lines = normalized.split('\n').filter(line => line.trim());
+      const titleRaw = (lines[0] || '').replace(/[*#]/g, '').trim();
+      const title = (titleHeader || titleRaw)
+        .replace(/^[:\-\s]*/, '')
+        .replace(/^(?:Scene|Chapter)\s+\d+\s*[:\-\u2013\u2014]\s*/i, '')
+        .trim() || `Scene ${index + 1}`;
+
+      // Use original block for cleaning so line-based rules apply
+      const rawBlock = block;
       // Last scene: no voice keyword (will use jump interaction instead)
-      const extracted = extractKeyword(text) || extractKeyword(rawContent);
+      const extracted = extractKeyword(block) || extractKeyword(normalized);
       const keyword = index === 5 ? null : (extracted || 'next');
-      const content = cleanSceneText(rawContent);
+      const content = cleanSceneText(rawBlock) || (lines.slice(1).join(' ').trim() || normalized);
+
+      const contentSansTitle = (() => {
+        const c = content || '';
+        const candidates = [title, `: ${title}`, `:${title}`, `${title}.`, `${title}!`, `${title}?`];
+        for (const cand of candidates) {
+          if (c.toLowerCase().startsWith(String(cand).toLowerCase())) {
+            return c.slice(String(cand).length).trim();
+          }
+        }
+        return c;
+      })();
+
+      const instruction = index === 5 ? null : (extractInstruction(block) || (keyword ? `Say "${keyword}" to go to the next page.` : null));
 
       scenes.push({
         id: `ai_scene_${index}`,
         title,
-        text: content,
+        text: contentSansTitle,
         keyword,
+        instruction,
         bg: backgroundColors[index % backgroundColors.length],
         image: images[index] ? `data:${images[index].mimeType};base64,${images[index].data}` : null
       });
@@ -115,13 +165,42 @@ const AIStoryGenerator = ({ onStoryGenerated }) => {
   const mutation = useMutation({
     mutationFn: generateStoryAPI,
     onSuccess: (result, variables) => {
-      const scenes = parseStoryIntoScenes(result.textContent, result.images || []);
+      const images = result.images || [];
+      let scenes;
+
+      if (Array.isArray(result.scenes) && result.scenes.length > 0) {
+        const backgroundColors = [
+          'from-amber-100 via-rose-100 to-sky-100',
+          'from-sky-100 via-indigo-100 to-fuchsia-100',
+          'from-emerald-100 via-teal-100 to-cyan-100',
+          'from-lime-100 via-emerald-100 to-teal-100',
+          'from-pink-100 via-rose-100 to-amber-100',
+          'from-slate-100 via-gray-100 to-sky-100'
+        ];
+        scenes = result.scenes.slice(0, 6).map((s, index) => {
+          const baseKeyword = typeof s.keyword === 'string' ? s.keyword.trim().toLowerCase() : null;
+          const keyword = index === 5 ? null : (baseKeyword || null);
+          const instruction = index === 5 ? null : (s.instruction || (keyword ? `Say "${keyword}" to go to the next page.` : null));
+          const img = s.image || (images[index] ? `data:${images[index].mimeType};base64,${images[index].data}` : null);
+          return {
+            id: `ai_scene_${index}`,
+            title: s.title || `Scene ${index + 1}`,
+            text: s.script || s.text || '',
+            keyword,
+            instruction,
+            bg: backgroundColors[index % backgroundColors.length],
+            image: img,
+          };
+        });
+      } else {
+        scenes = parseStoryIntoScenes(result.textContent, images);
+      }
 
       if (onStoryGenerated) {
         onStoryGenerated(scenes, {
           originalText: result.textContent,
-          images: result.images || [],
-          prompt: variables.prompt
+          images,
+          prompt: variables.prompt,
         });
       }
     },
@@ -201,39 +280,34 @@ ${styleGuidance}
 Core Task: Photo-to-Character Transformation
 If a photograph/selfie is provided, first analyze it and creatively transform the person into a charming, expressive illustrated character. Avoid photorealism; adopt a clean, modern digital storybook style unless the story specifies otherwise.
 
-Story Structure Requirements (very important):
-1) Read the user’s story idea below to understand plot, settings, and actions.
-2) Create exactly 6 scenes (pages) that tell a complete bedtime story arc.
-3) For Scenes 1–5, provide ALL of the following lines in order:
-   - Scene N: <Short Title>
-   - Keyword: <a simple kid-friendly word or 1–2 word phrase>
-   - Script: <the complete story text for that page, including any dialogue and narrative>
-   - Instruction: Say "<keyword>" to go to the next page.
-   The keyword must be contextually related to the scene (e.g., "open", "door", "lion", "magic").
-4) Scene 6 is the final celebratory ending page. For Scene 6, output ONLY:
-   - Scene 6: <Short Title>
-   - Script: <the complete story text for that page>
-   Do NOT include a Keyword or an Instruction on Scene 6.
-5) Generate a high-quality, family-friendly illustration for EACH scene that matches the script.
+VERY IMPORTANT — OUTPUT FORMAT (STRICT JSON ONLY):
+- Produce exactly 6 scenes (pages) that tell a complete bedtime story arc.
+- Return ONLY a single valid JSON object. No prose, no markdown, no comments, no code fences.
+- Do NOT include images inside the JSON. Images will be streamed separately in the same order (scene 1 through scene 6).
+
+The JSON MUST match this shape:
+{
+  "scenes": [
+    {
+      "title": "<short title>",
+      "script": "<full narrative text for the page>",
+      "keyword": "<simple word/phrase or null>",
+      "instruction": "<instruction text or null>"
+    },
+    { ... total 6 objects ... }
+  ]
+}
+
+Rules:
+- Scenes 1–5: keyword MUST be present and simple (e.g., "open", "lion", "magic").
+  Instruction MUST be of the form: Say "<keyword>" to go to the next page.
+- Scene 6: keyword MUST be null; instruction MUST be null. This is the final ending page.
 
 Strict Prohibitions:
 - Do not alter the established stylized appearance of the character once created.
 - All generated images must be 100% safe-for-work (SFW).
 
 Story idea: ${prompt}
-
-Output format guidance (text part):
-For Scenes 1–5 output lines exactly like this order:
-Scene N: Title
-Keyword: word or short phrase
-Script: Full narrative and dialogue for the page
-Instruction: Say "<keyword>" to go to the next page.
-
-For Scene 6 output lines exactly like this order:
-Scene 6: Title
-Script: Full narrative and dialogue for the page
-
-The application will parse the keywords and scripts from these lines. Include images as inline data in the multimodal output.
 `;
 
     return mutation.mutateAsync({

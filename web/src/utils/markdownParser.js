@@ -45,7 +45,7 @@ export function parseMarkdownStory(markdownContent, characterName = "Lily", char
 
     // Check for page headers (both ## and ### formats)
     // Handle both "Page X: Title" and "Page X:" formats
-    const pageMatch = line.match(/^#{2,3} Page (\d+):?\s*(.*)$/);
+    const pageMatch = line.match(/^#{2,3}\s*(?:Page|Scene)\s+(\d+):?\s*(.*)$/i);
     if (pageMatch) {
       // Save previous scene if exists
       if (currentScene) {
@@ -98,10 +98,40 @@ export function parseMarkdownStory(markdownContent, characterName = "Lily", char
       continue;
     }
 
+    // Skip plain "Scene N:" header lines that might appear in content and optionally set title
+    if (/^Scene\s+\d+\s*:/i.test(line)) {
+      if (currentScene && !currentScene.title) {
+        const tm = line.match(/^Scene\s+\d+\s*:\s*(.*)$/i);
+        if (tm) currentScene.title = tm[1].trim();
+      }
+      continue;
+    }
+
+    // Extract explicit keyword metadata
+    const keyMeta = line.match(/^(?:Keyword|Voice\s*Keyword)\s*[:\-]\s*["\u201c]?([^"\n\u201d]+)["\u201d]?/i);
+    if (keyMeta && currentScene) {
+      currentScene.keyword = keyMeta[1].trim().toLowerCase();
+      continue;
+    }
+
+    // Extract from instruction "Say \"...\" to ..."
+    const sayMeta = line.match(/Say\s+["\u201c]([^"\u201d]+)["\u201d]\s+to/i);
+    if (sayMeta && currentScene) {
+      currentScene.keyword = sayMeta[1].trim().toLowerCase();
+      continue; // Do not include instruction line in text
+    }
+
+    // Skip instruction lines
+    if (/^(?:Instruction|Voice\s*Instruction)\s*[:\-]/i.test(line)) {
+      continue;
+    }
+
     // Add to current scene text
     if (currentScene && line) {
-      // Strip leading and trailing quotes if present
-      let cleanLine = line;
+      // Strip 'Script:' label but keep content
+      let cleanLine = line.replace(/^\s*Script\s*:\s*/i, '');
+
+      // Strip leading and trailing straight quotes if present
       if (cleanLine.startsWith('"') && cleanLine.endsWith('"')) {
         cleanLine = cleanLine.slice(1, -1);
       }

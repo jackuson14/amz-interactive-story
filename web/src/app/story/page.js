@@ -153,7 +153,7 @@ export default function StoryPage() {
   // The End page state
   const [showTheEnd, setShowTheEnd] = useState(false);
   const [celebrationHandsUpDetected, setCelebrationHandsUpDetected] = useState(false);
-  
+
   // User interaction state for autoplay policy compliance
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
   const [showStartButton, setShowStartButton] = useState(true);
@@ -168,15 +168,22 @@ export default function StoryPage() {
   const getPageSpeechKeyword = useCallback((pageText) => {
     if (!pageText) return null;
 
+    const normalize = (s) => String(s)
+      .toLowerCase()
+      .replace(/["“”‘’]/g, '')       // remove quotes
+      .replace(/[!.,?]/g, '')         // remove punctuation
+      .replace(/[-–—]/g, ' ')         // hyphens/dashes to space
+      .replace(/\s+/g, ' ')          // collapse whitespace
+      .trim();
+
     console.log('🔍 Extracting keyword from text:', pageText);
 
     // Look for pattern: Say "keyword" to ... (with optional punctuation)
-    const sayPattern = /Say "([^"]+)"[!.]?\s+to/i;
+    const sayPattern = /Say\s+"([^"]+)"[!.]?\s+to/i;
     const match = pageText.match(sayPattern);
 
     if (match) {
-      // Remove punctuation from the keyword
-      const keyword = match[1].toLowerCase().replace(/[!.,?]/g, '');
+      const keyword = normalize(match[1]);
       console.log('✅ Found keyword:', keyword);
       return keyword;
     }
@@ -186,15 +193,8 @@ export default function StoryPage() {
   }, []);
 
 
-  // Prefer explicit scene keyword when available; fallback to parsing text
-  const getExpectedKeyword = useCallback(() => {
-    // Do not use voice keywords on the last scene; last scene uses jump interaction
-    if (idx === scenes.length - 1) return null;
-    if (current?.keyword) {
-      return String(current.keyword).toLowerCase();
-    }
-    return getPageSpeechKeyword(current?.text);
-  }, [current, getPageSpeechKeyword, idx, scenes.length]);
+  // getExpectedKeyword is defined after scenes/current are initialized to avoid TDZ
+
 
   // AI Story Generator
   const { generateAIStory, loading: aiLoading, error: aiError, setError: setAiError } = AIStoryGenerator({
@@ -326,8 +326,8 @@ export default function StoryPage() {
   );
   const scenes = customScenes ?? baseScenes;
 
-  // Show loading state if we're waiting for markdown content
-  const isLoadingMarkdown = storyId && SAMPLE_STORIES.find(s => s.id === storyId)?.isMarkdown && !markdownStory;
+  // Show loading state if we're waiting for markdown content (but not when using custom AI scenes)
+  const isLoadingMarkdown = !customScenes && storyId && SAMPLE_STORIES.find(s => s.id === storyId)?.isMarkdown && !markdownStory;
 
   useEffect(() => {
     try {
@@ -382,6 +382,24 @@ export default function StoryPage() {
   }, [storyId, characterName, characterGender]);
 
   const current = scenes[idx];
+  // Prefer explicit scene keyword when available; fallback to parsing text
+  const getExpectedKeyword = () => {
+    // Do not use voice keywords on the last scene; last scene uses jump interaction
+    if (idx === scenes.length - 1) return null;
+    const page = scenes[idx];
+    if (page?.keyword) {
+      const normalize = (s) => String(s)
+        .toLowerCase()
+        .replace(/["\u201c\u201d\u2018\u2019]/g, '')
+        .replace(/[!.,?]/g, '')
+        .replace(/[-\u2013\u2014]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      return normalize(page.keyword);
+    }
+    return getPageSpeechKeyword(page?.text);
+  };
+
 
   // Debounced next function to prevent page skipping
   const next = useCallback(() => {
@@ -390,6 +408,7 @@ export default function StoryPage() {
 
     // Prevent multiple navigation calls within 1.5 seconds
     if (navigationInProgress.current || timeSinceLastNav < 1500) {
+
       console.log('🚫 Navigation blocked - too soon since last navigation', {
         navigationInProgress: navigationInProgress.current,
         timeSinceLastNav,
@@ -714,7 +733,7 @@ export default function StoryPage() {
                 What a wonderful bedtime story! All the animals at the zoo are now fast asleep,
                 and it&apos;s time for you to have sweet dreams too.
               </p>
-              
+
               {!celebrationHandsUpDetected ? (
                 <>
                   {/* Hands up celebration section - shown before gesture */}
@@ -729,9 +748,9 @@ export default function StoryPage() {
                       Show the camera both your hands raised up like you&apos;re cheering!
                     </p>
                   </div>
-                  
+
                   {/* Pose detection component for hands-up celebration */}
-                  <PoseDetection 
+                  <PoseDetection
                     isActive={true}
                     detectionMode="handsUp"
                     onHandsUpDetected={() => {
@@ -739,7 +758,7 @@ export default function StoryPage() {
                       setCelebrationHandsUpDetected(true);
                     }}
                   />
-                  
+
                   <p className="text-lg text-gray-600 mt-6">
                     Raise both hands high to continue! 🙌
                   </p>
@@ -755,12 +774,12 @@ export default function StoryPage() {
                       You did it! Ready for another adventure?
                     </p>
                   </div>
-                  
+
                   <div className="space-y-4">
                     <p className="text-lg text-gray-600">
                       Thank you for joining us on this magical journey! 🦁🐵🐧🦛
                     </p>
-                    <button 
+                    <button
                       onClick={() => window.location.href = '/play/idea'}
                       className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 px-8 rounded-xl text-lg transition-all transform hover:scale-105 shadow-lg animate-bounce"
                     >
