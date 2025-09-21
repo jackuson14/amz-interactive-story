@@ -458,7 +458,7 @@ export default function PlayAppearancePage() {
                 aria-disabled={!canProceed}
                 onClick={(e) => { if (!canProceed) e.preventDefault(); }}
               >
-                {canProceed ? "Let&apos;s Choose a Story! →" : "Take a photo or choose a character!"}
+                {canProceed ? "Let's Choose a Story! →" : "Take a photo or choose a character!"}
               </Link>
             </div>
               </div>

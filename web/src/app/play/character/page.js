@@ -159,7 +159,7 @@ export default function PlayCharacterPage() {
                     }
                   }}
                 >
-                  {canProceed ? "Let&apos;s Go! →" : "Fill in all the fun stuff above!"}
+                  {canProceed ? "Let's Go! →" : "Fill in all the fun stuff above!"}
                 </Link>
               </div>
               </div>
