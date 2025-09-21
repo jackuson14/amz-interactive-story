@@ -18,38 +18,15 @@ Modern children face significant challenges related to excessive screen time:
 
 ---
 
-## 🏗️ System Architecture
-
-### High-Level Architecture
-
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Frontend      │    │   AWS Cloud     │    │   AI Services   │
-│   (Next.js)     │◄──►│   Infrastructure │◄──►│ (Amazon Bedrock)│
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-    ┌────▼────┐            ┌─────▼─────┐         ┌──────▼──────┐
-    │ Privacy │            │   AWS     │         │  Real-time  │
-    │ Layer   │            │ Services  │         │   Story     │
-    │(LocalSt)│            │           │         │ Generation  │
-    └─────────┘            └───────────┘         └─────────────┘
-```
-
 ### AWS Services Integration
 
 **Current Implementation:**
 - **AWS Amplify**: Frontend hosting and deployment
 - **AWS CloudFront**: Global content delivery network
 - **AWS Route 53**: DNS management and domain routing
-- **AWS Lambda**: Serverless API endpoints (planned migration)
+- **AWS Lambda**: Serverless API endpoints
 - **AWS S3**: Static asset storage and backup
-
-**AWS AI Services:**
-- **Amazon Bedrock**: Advanced AI models for story and image generation
-- **AWS Rekognition**: Enhanced facial recognition and character consistency
 - **Amazon Polly**: Superior text-to-speech with children's voices
-- **AWS CloudWatch**: Comprehensive monitoring and analytics
-- **Amazon DynamoDB**: User preferences and story metadata storage
 
 ### Technology Stack
 
@@ -58,18 +35,6 @@ Modern children face significant challenges related to excessive screen time:
 - React 19.1.0 with concurrent features
 - TailwindCSS 4 for responsive design
 - Progressive Web App capabilities
-
-**AI/ML:**
-- Amazon Bedrock with Claude and Stable Diffusion models
-- Multimodal AI processing for image and text generation
-- Streaming responses for real-time story creation
-- Advanced prompt engineering for character consistency
-
-**Privacy & Security:**
-- Client-side data storage (localStorage)
-- No server-side personal data retention
-- GDPR/COPPA compliant by design
-- Secure camera API integration
 
 ---
 
