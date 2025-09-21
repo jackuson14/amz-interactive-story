@@ -22,6 +22,13 @@ const s3Client = new S3Client({
 
 const TTS_BUCKET = process.env.APP_AWS_TTS_BUCKET || process.env.S3_TTS_BUCKET || process.env.AWS_S3_BUCKET_TTS;
 
+// Request deduplication - track active synthesis requests
+const activeRequests = new Map();
+
+function getRequestKey(text, voiceId, options) {
+  return createHash('md5').update(JSON.stringify({ text, voiceId, options })).digest('hex');
+}
+
 function makeCacheKeys({ voiceId, hash }) {
   const base = `tts/${voiceId}/${hash}`;
   return { audioKey: `${base}.mp3`, marksKey: `${base}.marks.json` };
@@ -58,24 +65,24 @@ function convertToSSML(text, voiceId) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 
-  // Add exciting intonation - do word replacements first, then punctuation
+  // Neural-compatible enhancements - use rate and volume instead of pitch
   processedText = processedText
-    // Make exciting words higher pitch and faster
-    .replace(/\b(welcome|magical|adventure|ready|amazing|wonderful|exciting|fantastic)\b/gi, '<prosody rate="110%" pitch="+25%">$1</prosody>')
-    // Make animal names fun and bouncy
-    .replace(/\b(lion|monkey|penguin|hippo|elephant|giraffe|zebra|animals?)\b/gi, '<prosody pitch="+30%" rate="105%">$1</prosody>')
-    // Add emphasis to action words
-    .replace(/\b(roar|swing|jump|sleep|goodnight|go|begin)\b/gi, '<prosody pitch="+20%" rate="110%">$1</prosody>');
+    // Make exciting words faster and louder (neural-compatible)
+    .replace(/\b(welcome|magical|adventure|ready|amazing|wonderful|exciting|fantastic)\b/gi, '<prosody rate="115%" volume="loud">$1</prosody>')
+    // Make animal names bouncy with rate changes only
+    .replace(/\b(lion|monkey|penguin|hippo|elephant|giraffe|zebra|animals?)\b/gi, '<prosody rate="110%" volume="medium">$1</prosody>')
+    // Emphasize action words with rate and emphasis
+    .replace(/\b(roar|swing|jump|sleep|goodnight|go|begin)\b/gi, '<emphasis level="strong"><prosody rate="105%">$1</prosody></emphasis>');
 
-  // Add pauses after prosody tags to avoid conflicts
+  // Add natural pauses (fully supported)
   processedText = processedText
     .replace(/!\s+/g, '! <break time="600ms"/>')
     .replace(/\?\s+/g, '? <break time="700ms"/>')
     .replace(/\.\s+/g, '. <break time="800ms"/>')
     .replace(/,\s+/g, ', <break time="300ms"/>');
 
-  // Wrap in SSML speak tags with normal rate but exciting delivery
-  return `<speak><break time="500ms"/><prosody rate="100%">${processedText}</prosody><break time="300ms"/></speak>`;
+  // Wrap in SSML speak tags with neural-friendly prosody
+  return `<speak><break time="500ms"/><prosody rate="95%" volume="medium">${processedText}</prosody><break time="300ms"/></speak>`;
 }
 
 export async function POST(request) {
@@ -113,12 +120,29 @@ export async function POST(request) {
       );
     }
 
+    // Request deduplication
+    const requestKey = getRequestKey(text, selectedVoice, options);
 
+    // Check if identical request is already in progress
+    if (activeRequests.has(requestKey)) {
+      console.log('Duplicate request detected, waiting for existing synthesis...');
+      try {
+        // Wait for the existing request to complete
+        const existingResult = await activeRequests.get(requestKey);
+        return NextResponse.json(existingResult);
+      } catch (error) {
+        // If existing request failed, remove it and continue with new request
+        activeRequests.delete(requestKey);
+      }
+    }
 
-    // Use SSML for natural speech if requested, otherwise use plain text
-    const useSSML = options.naturalSpeech !== false; // Default to true
-    const finalText = useSSML ? convertToSSML(text, selectedVoice) : text;
-    const textType = useSSML ? 'ssml' : 'text';
+    // Create promise for this request
+    const synthesisPromise = (async () => {
+      try {
+        // Use SSML for natural speech if requested, otherwise use plain text
+        const useSSML = options.naturalSpeech !== false; // Default to true
+        const finalText = useSSML ? convertToSSML(text, selectedVoice) : text;
+        const textType = useSSML ? 'ssml' : 'text';
 
     console.log('Using natural speech:', useSSML);
     if (useSSML) {
@@ -146,11 +170,13 @@ export async function POST(request) {
 
     // Call Polly with fallback handling
     let response;
+    let ssmlFallbackUsed = false;
     try {
       response = await pollyClient.send(command);
     } catch (ssmlError) {
       if (useSSML && ssmlError.name === 'InvalidSsmlException') {
         console.log('SSML failed, falling back to plain text:', ssmlError.message);
+        ssmlFallbackUsed = true;
         // Fallback to plain text
         const fallbackCommand = new SynthesizeSpeechCommand({
           Text: text,
@@ -177,16 +203,21 @@ export async function POST(request) {
     // Generate speech marks (word + sentence)
     let marks = [];
     try {
+      // First attempt: Use same text/format as successful audio synthesis
+      const marksTextType = useSSML && !ssmlFallbackUsed ? 'ssml' : 'text';
+      const marksText = useSSML && !ssmlFallbackUsed ? finalText : text;
+
       const marksCommand = new SynthesizeSpeechCommand({
-        Text: (options.naturalSpeech !== false) ? finalText : text, // approximate; may differ if SSML fallback triggered
+        Text: marksText,
         VoiceId: selectedVoice,
         OutputFormat: 'json',
         SpeechMarkTypes: ['word', 'sentence'],
         SampleRate: options.sampleRate || process.env.AWS_POLLY_SAMPLE_RATE || '22050',
         Engine: options.engine || process.env.AWS_POLLY_VOICE_ENGINE || 'neural',
-        TextType: (options.naturalSpeech !== false) ? 'ssml' : 'text',
+        TextType: marksTextType,
         LanguageCode: CHILD_FRIENDLY_VOICES[selectedVoice].language,
       });
+
       const marksResponse = await pollyClient.send(marksCommand);
       let acc = '';
       for await (const chunk of marksResponse.AudioStream) {
@@ -199,8 +230,41 @@ export async function POST(request) {
         }
       }
       if (acc.trim()) { try { marks.push(JSON.parse(acc)); } catch {} }
-    } catch (e) {
-      console.warn('Speech marks generation failed:', e?.message || e);
+    } catch (marksError) {
+      console.warn('Speech marks generation failed:', marksError?.message || marksError);
+
+      // Fallback: Try again with plain text if SSML was used
+      if (useSSML && marksError.name === 'InvalidSsmlException') {
+        try {
+          console.log('Retrying speech marks with plain text fallback');
+          const fallbackMarksCommand = new SynthesizeSpeechCommand({
+            Text: text, // Use original plain text
+            VoiceId: selectedVoice,
+            OutputFormat: 'json',
+            SpeechMarkTypes: ['word', 'sentence'],
+            SampleRate: options.sampleRate || process.env.AWS_POLLY_SAMPLE_RATE || '22050',
+            Engine: options.engine || process.env.AWS_POLLY_VOICE_ENGINE || 'neural',
+            TextType: 'text',
+            LanguageCode: CHILD_FRIENDLY_VOICES[selectedVoice].language,
+          });
+
+          const fallbackMarksResponse = await pollyClient.send(fallbackMarksCommand);
+          let acc = '';
+          for await (const chunk of fallbackMarksResponse.AudioStream) {
+            acc += chunk.toString();
+            const lines = acc.split('\n');
+            acc = lines.pop() || '';
+            for (const line of lines) {
+              if (!line.trim()) continue;
+              try { marks.push(JSON.parse(line)); } catch {}
+            }
+          }
+          if (acc.trim()) { try { marks.push(JSON.parse(acc)); } catch {} }
+        } catch (fallbackError) {
+          console.warn('Speech marks fallback also failed:', fallbackError?.message || fallbackError);
+          // Continue without marks - not critical for basic functionality
+        }
+      }
     }
 
     // Best-effort S3 cache write of audio and marks
@@ -224,19 +288,36 @@ export async function POST(request) {
       }
     }
 
-    // Return audio as base64 for client-side playback along with marks
-    const audioBase64 = audioBuffer.toString('base64');
-    return NextResponse.json({
-      success: true,
-      audio: audioBase64,
-      marks,
-      metadata: {
-        voiceId: selectedVoice,
-        voiceInfo: CHILD_FRIENDLY_VOICES[selectedVoice],
-        outputFormat: command.input.OutputFormat,
-        textLength: text.length,
+        // Return audio as base64 for client-side playback along with marks
+        const audioBase64 = audioBuffer.toString('base64');
+        return {
+          success: true,
+          audio: audioBase64,
+          marks,
+          metadata: {
+            voiceId: selectedVoice,
+            voiceInfo: CHILD_FRIENDLY_VOICES[selectedVoice],
+            outputFormat: command.input.OutputFormat,
+            textLength: text.length,
+          }
+        };
+      } catch (error) {
+        activeRequests.delete(requestKey);
+        throw error;
       }
-    });
+    })();
+
+    // Store the promise immediately to prevent duplicates
+    activeRequests.set(requestKey, synthesisPromise);
+
+    // Return the result
+    try {
+      const result = await synthesisPromise;
+      return NextResponse.json(result);
+    } finally {
+      // Clean up completed request
+      activeRequests.delete(requestKey);
+    }
 
   } catch (error) {
     console.error('TTS API Error:', error);

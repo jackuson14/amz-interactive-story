@@ -1,11 +1,11 @@
-# StoryMe: AI-Powered Interactive Storytelling for Children
+# Polly Story: AI-Powered Interactive Storytelling for Children
 ### AWS Hackathon Submission - September 2024
 
 ---
 
 ## 🚀 Project Overview
 
-**StoryMe** is a revolutionary AI-powered interactive storytelling platform designed to transform screen time from passive consumption to active, educational engagement for children aged 2-6. By leveraging cutting-edge AI technology, StoryMe creates personalized stories where children become the protagonists of their own adventures.
+**Polly Story** is a revolutionary AI-powered interactive storytelling platform designed to transform screen time from passive consumption to active, educational engagement for children aged 2-6. By leveraging cutting-edge AI technology, Polly Story creates personalized stories where children become the protagonists of their own adventures.
 
 ### Problem Statement
 
@@ -14,7 +14,7 @@ Modern children face significant challenges related to excessive screen time:
 - **Exposure to Inappropriate Content**: "Brainrot" content and algorithmically-driven feeds pose risks to young minds
 - **Lack of Interactive Learning**: Traditional screen time offers minimal educational value or engagement
 
-**StoryMe addresses these critical issues** by providing a safe, educational, and time-controlled alternative that transforms necessary screen time into valuable learning opportunities.
+**Polly Story addresses these critical issues** by providing a safe, educational, and time-controlled alternative that transforms necessary screen time into valuable learning opportunities.
 
 ---
 
@@ -423,11 +423,11 @@ NEXT_PUBLIC_APP_ENV=production
 
 ## 🏆 Conclusion
 
-**StoryMe represents a paradigm shift in children's digital entertainment**, moving from passive consumption to active, educational engagement. By combining cutting-edge AI technology with secure design principles, we address critical childhood development challenges while creating a sustainable, scalable business model.
+**Polly Story represents a paradigm shift in children's digital entertainment**, moving from passive consumption to active, educational engagement. By combining cutting-edge AI technology with secure design principles, we address critical childhood development challenges while creating a sustainable, scalable business model.
 
-Our innovative approach to personalized storytelling not only transforms screen time into learning time but also provides parents with a guilt-free solution that promotes their children's cognitive and emotional development. With strong commercial viability and significant social impact potential, StoryMe is positioned to become the leading platform for next-generation children's entertainment.
+Our innovative approach to personalized storytelling not only transforms screen time into learning time but also provides parents with a guilt-free solution that promotes their children's cognitive and emotional development. With strong commercial viability and significant social impact potential, Polly Story is positioned to become the leading platform for next-generation children's entertainment.
 
-**The future of childhood learning is personalized, private, and powered by AI. StoryMe makes that future available today.**
+**The future of childhood learning is personalized, private, and powered by AI. Polly Story makes that future available today.**
 
 ---
 

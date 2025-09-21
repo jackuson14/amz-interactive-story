@@ -288,7 +288,9 @@ export default function StoryPage() {
     }, 1500);
   }, [scenes.length, idx]);
   
-  const prev = () => setIdx((v) => Math.max(v - 1, 0));
+  const prev = useCallback(() => {
+    setIdx((v) => Math.max(v - 1, 0));
+  }, []);
 
   // Stop listening for voice commands with improved reliability
   const stopListening = useCallback(() => {
@@ -595,44 +597,43 @@ export default function StoryPage() {
   }, [customScenes, messages.length, handleGenerate, storyId]);
 
   // AWS Polly TTS functions
-  const speakCurrent = async () => {
+  const speakCurrent = useCallback(async () => {
     try {
       if (!current) return;
-      
+
       // If paused, resume
       if (tts.isPaused) {
         tts.play();
         return;
       }
-      
+
       // Create story text with character name replacement
       const storyText = `${current.title}. ${current.text}`;
       const personalizedText = storyText.replace(/Lily/g, characterName);
-      
+
       // Stop current audio and synthesize new speech
-      
       const result = await tts.synthesizeAndPlay(personalizedText);
-      
+
       if (result.success) {
-        // Auto-start listening after read-aloud finishes (when audio ends)
+        // Auto-start listening after read-aloud finishes
         // This will be handled by the audio 'ended' event in useTTS hook
       }
     } catch (error) {
       console.error('Error speaking current scene:', error);
     }
-  };
+  }, [current, tts, characterName]);
 
-  const pauseReading = () => {
+  const pauseReading = useCallback(() => {
     tts.pause();
-  };
+  }, [tts]);
 
-  const stopReading = () => {
+  const stopReading = useCallback(() => {
     tts.stop();
     // Stop listening when read-aloud is manually stopped
     if (isListening) {
       stopListening();
     }
-  };
+  }, [tts, isListening, stopListening]);
   // If playing, re-speak when scene changes
   useEffect(() => {
     if (tts.isPlaying) speakCurrent();
