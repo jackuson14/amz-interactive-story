@@ -964,19 +964,6 @@ export default function StoryPage() {
                       className="object-cover rounded-xl"
                       unoptimized
                     />
-                    {/* Optional overlay for user selfie in corner */}
-                    {selfie && (
-                      <div className="absolute bottom-4 right-4">
-                        <Image
-                          src={selfie.url}
-                          alt="you"
-                          width={80}
-                          height={80}
-                          className="w-16 h-16 sm:w-20 sm:h-20 rounded-full shadow-lg ring-2 ring-white/80"
-                          unoptimized
-                        />
-                      </div>
-                    )}
                   </div>
                 ) : (
                   // No story image - use original gradient design
@@ -984,11 +971,6 @@ export default function StoryPage() {
                     <div className="absolute inset-0 opacity-40">
                       <div className="w-48 h-48 rounded-full bg-white/60 blur-2xl absolute -top-10 -left-10" />
                       <div className="w-56 h-56 rounded-full bg-white/40 blur-2xl absolute bottom-0 right-0" />
-                    </div>
-                    <div className="absolute left-1/2 -translate-x-1/2 bottom-6">
-                      {selfie && (
-                        <Image src={selfie.url} alt="you" width={192} height={192} className="w-32 sm:w-40 md:w-48 h-auto rounded-lg shadow-lg ring-1 ring-black/10" unoptimized />
-                      )}
                     </div>
                   </>
                 )}
