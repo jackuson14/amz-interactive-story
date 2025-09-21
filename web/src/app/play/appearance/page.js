@@ -407,7 +407,7 @@ export default function PlayAppearancePage() {
 
             {/* Next Button */}
             <div className="mt-12 text-center">
-              {characterType === "selfie" && selfie && !generatedCharacter && (
+              {characterType === "selfie" && selfie && (
                 <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                   <p className="text-blue-800 font-medium">
                     ✅ You can continue now, or generate a character for a cartoon version of you.

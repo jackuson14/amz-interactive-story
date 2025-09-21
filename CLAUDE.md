@@ -5,6 +5,8 @@ An interactive children's story application built with Next.js that allows kids 
 
 ## Architecture
 
+![System Architecture](documents/system%20architecture.png)
+
 ### Tech Stack
 - **Framework**: Next.js 15.5.3 with React 19.1.0
 - **Styling**: Tailwind CSS 4.0
@@ -85,7 +87,7 @@ Used for stories where `scene.bg` starts with `/` (URL path):
 - No header or distracting UI elements
 - Semi-transparent navigation buttons
 
-### Traditional Grid Layout  
+### Traditional Grid Layout
 Used for gradient-based stories:
 - Header with navigation
 - Split view: visual left, text right
