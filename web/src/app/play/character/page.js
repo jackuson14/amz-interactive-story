@@ -43,7 +43,7 @@ export default function PlayCharacterPage() {
       {/* Informational Banner */}
       <div className="w-full bg-gradient-to-r from-amber-400 to-yellow-400 text-gray-900 py-2 px-4 text-center">
         <p className="text-sm font-medium">
-          ℹ️ Image style depends on kids' age. Age 3-4 years old have different styling than 5-6 years old. For the best results, choose 5-6 years old boy.
+          ℹ️ Image style depends on kids’ age. Age 3-4 years old have different styling than 5-6 years old. For the best results, choose 5-6 years old boy.
         </p>
       </div>
       
