@@ -55,7 +55,7 @@ export default function PlayCharacterPage() {
                   Step 1 of 3
                 </div>
                 <h1 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-extrabold text-white">Tell us about yourself!</h1>
-                <p className="text-lg lg:text-xl text-white mt-2 lg:mb-8">Let's create your amazing character for the story adventure!</p>
+                <p className="text-lg lg:text-xl text-white mt-2 lg:mb-8">Let&apos;s create your amazing character for the story adventure!</p>
               </div>
               <div className="hidden lg:flex flex-grow items-end">
                 <Image 
@@ -159,7 +159,7 @@ export default function PlayCharacterPage() {
                     }
                   }}
                 >
-                  {canProceed ? "Let's Go! →" : "Fill in all the fun stuff above!"}
+                  {canProceed ? "Let&apos;s Go! →" : "Fill in all the fun stuff above!"}
                 </Link>
               </div>
               </div>

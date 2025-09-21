@@ -443,7 +443,7 @@ export default function PlayAppearancePage() {
                     Your personalized character will be generated as part of your story!
                   </p>
                   <p className="text-blue-700 text-sm mt-1">
-                    We'll create a cartoon version of you that appears in each story scene.
+                    We&apos;ll create a cartoon version of you that appears in each story scene.
                   </p>
                 </div>
               )}
@@ -458,7 +458,7 @@ export default function PlayAppearancePage() {
                 aria-disabled={!canProceed}
                 onClick={(e) => { if (!canProceed) e.preventDefault(); }}
               >
-                {canProceed ? "Let's Choose a Story! →" : "Take a photo or choose a character!"}
+                {canProceed ? "Let&apos;s Choose a Story! →" : "Take a photo or choose a character!"}
               </Link>
             </div>
               </div>
