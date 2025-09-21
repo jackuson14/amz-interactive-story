@@ -1,14 +1,40 @@
 import { NextResponse } from 'next/server';
 import { PollyClient, SynthesizeSpeechCommand, DescribeVoicesCommand } from '@aws-sdk/client-polly';
+import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { createHash } from 'crypto';
 
 // Initialize Polly client
 const pollyClient = new PollyClient({
-  region: process.env.AWS_POLLY_REGION || 'ap-southeast-1',
+  region: process.env.APP_AWS_POLLY_REGION || 'ap-southeast-1',
   credentials: {
     accessKeyId: process.env.APP_AWS_ACCESS_KEY_ID,
     secretAccessKey: process.env.APP_AWS_SECRET_ACCESS_KEY,
   },
 });
+// Initialize S3 client and caching helpers
+const s3Client = new S3Client({
+  region: process.env.AWS_S3_REGION || process.env.APP_AWS_POLLY_REGION || 'ap-southeast-1',
+  credentials: {
+    accessKeyId: process.env.APP_AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.APP_AWS_SECRET_ACCESS_KEY,
+  },
+});
+
+const TTS_BUCKET = process.env.APP_AWS_TTS_BUCKET || process.env.S3_TTS_BUCKET || process.env.AWS_S3_BUCKET_TTS;
+
+function makeCacheKeys({ voiceId, hash }) {
+  const base = `tts/${voiceId}/${hash}`;
+  return { audioKey: `${base}.mp3`, marksKey: `${base}.marks.json` };
+}
+
+async function streamToBuffer(stream) {
+  const chunks = [];
+  for await (const chunk of stream) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
+}
+
 
 // Child-friendly voices
 const CHILD_FRIENDLY_VOICES = {
@@ -57,7 +83,7 @@ export async function POST(request) {
     // Debug: Log raw request body
     const body = await request.text();
     console.log('Raw request body:', body);
-    
+
     let parsedBody;
     try {
       parsedBody = JSON.parse(body);
@@ -68,7 +94,7 @@ export async function POST(request) {
         { status: 400 }
       );
     }
-    
+
     const { text, voiceId, options = {} } = parsedBody;
 
     if (!text) {
@@ -87,16 +113,18 @@ export async function POST(request) {
       );
     }
 
+
+
     // Use SSML for natural speech if requested, otherwise use plain text
     const useSSML = options.naturalSpeech !== false; // Default to true
     const finalText = useSSML ? convertToSSML(text, selectedVoice) : text;
     const textType = useSSML ? 'ssml' : 'text';
-    
+
     console.log('Using natural speech:', useSSML);
     if (useSSML) {
       console.log('Generated SSML:', finalText);
     }
-    
+
     // Prepare synthesis parameters
     const command = new SynthesizeSpeechCommand({
       Text: finalText,
@@ -138,7 +166,7 @@ export async function POST(request) {
         throw ssmlError;
       }
     }
-    
+
     // Convert audio stream to buffer
     const chunks = [];
     for await (const chunk of response.AudioStream) {
@@ -146,26 +174,75 @@ export async function POST(request) {
     }
     const audioBuffer = Buffer.concat(chunks);
 
-    // Return audio as base64 for client-side playback
-    const audioBase64 = audioBuffer.toString('base64');
+    // Generate speech marks (word + sentence)
+    let marks = [];
+    try {
+      const marksCommand = new SynthesizeSpeechCommand({
+        Text: (options.naturalSpeech !== false) ? finalText : text, // approximate; may differ if SSML fallback triggered
+        VoiceId: selectedVoice,
+        OutputFormat: 'json',
+        SpeechMarkTypes: ['word', 'sentence'],
+        SampleRate: options.sampleRate || process.env.AWS_POLLY_SAMPLE_RATE || '22050',
+        Engine: options.engine || process.env.AWS_POLLY_VOICE_ENGINE || 'neural',
+        TextType: (options.naturalSpeech !== false) ? 'ssml' : 'text',
+        LanguageCode: CHILD_FRIENDLY_VOICES[selectedVoice].language,
+      });
+      const marksResponse = await pollyClient.send(marksCommand);
+      let acc = '';
+      for await (const chunk of marksResponse.AudioStream) {
+        acc += chunk.toString();
+        const lines = acc.split('\n');
+        acc = lines.pop() || '';
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try { marks.push(JSON.parse(line)); } catch {}
+        }
+      }
+      if (acc.trim()) { try { marks.push(JSON.parse(acc)); } catch {} }
+    } catch (e) {
+      console.warn('Speech marks generation failed:', e?.message || e);
+    }
 
+    // Best-effort S3 cache write of audio and marks
+    if (TTS_BUCKET) {
+      try {
+        const engine = options.engine || process.env.AWS_POLLY_VOICE_ENGINE || 'neural';
+        const sampleRate = options.sampleRate || process.env.AWS_POLLY_SAMPLE_RATE || '22050';
+        const outputFormat = options.outputFormat || process.env.AWS_POLLY_OUTPUT_FORMAT || 'mp3';
+        const language = CHILD_FRIENDLY_VOICES[selectedVoice].language;
+        const usedText = (options.naturalSpeech !== false) ? finalText : text;
+        const usedTextType = (options.naturalSpeech !== false) ? 'ssml' : 'text';
+        const hashInput = JSON.stringify({ text: usedText, textType: usedTextType, voiceId: selectedVoice, engine, sampleRate, outputFormat, language });
+        const hash = createHash('sha256').update(hashInput).digest('hex');
+        const { audioKey, marksKey } = makeCacheKeys({ voiceId: selectedVoice, hash });
+        await Promise.allSettled([
+          s3Client.send(new PutObjectCommand({ Bucket: TTS_BUCKET, Key: audioKey, Body: audioBuffer, ContentType: 'audio/mpeg' })),
+          s3Client.send(new PutObjectCommand({ Bucket: TTS_BUCKET, Key: marksKey, Body: Buffer.from(JSON.stringify(marks)), ContentType: 'application/json' })),
+        ]);
+      } catch (e) {
+        console.warn('S3 cache write skipped:', e?.message || e);
+      }
+    }
+
+    // Return audio as base64 for client-side playback along with marks
+    const audioBase64 = audioBuffer.toString('base64');
     return NextResponse.json({
       success: true,
       audio: audioBase64,
+      marks,
       metadata: {
         voiceId: selectedVoice,
         voiceInfo: CHILD_FRIENDLY_VOICES[selectedVoice],
         outputFormat: command.input.OutputFormat,
         textLength: text.length,
-        estimatedDuration: Math.ceil(text.length / 10), // Rough estimate
       }
     });
 
   } catch (error) {
     console.error('TTS API Error:', error);
-    
+
     return NextResponse.json(
-      { 
+      {
         error: 'Failed to synthesize speech',
         details: error.message,
         success: false
@@ -187,7 +264,7 @@ export async function GET(request) {
     });
 
     const response = await pollyClient.send(command);
-    
+
     // Filter to child-friendly voices
     const childFriendlyVoices = response.Voices
       .filter(voice => CHILD_FRIENDLY_VOICES[voice.Id])

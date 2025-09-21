@@ -28,7 +28,7 @@ const getPollyClient = () => {
   if (!pollyClient) {
     try {
       pollyClient = new PollyClient({
-        region: process.env.AWS_POLLY_REGION || 'ap-southeast-1',
+        region: process.env.APP_AWS_POLLY_REGION || 'ap-southeast-1',
         credentials: fromEnv(),
       });
     } catch (error) {
