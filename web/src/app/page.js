@@ -2,135 +2,131 @@ import Link from "next/link";
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-gradient-to-br from-orange-50 via-yellow-50 to-blue-50">
+    <main className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-amber-50">
       {/* Hero */}
-      <section className="px-6 sm:px-10 md:px-16 py-20 sm:py-28 text-center relative overflow-hidden">
-        {/* Decorative shapes */}
-        <div className="absolute top-10 left-10 w-20 h-20 bg-gradient-to-br from-orange-400 to-orange-500 rounded-full opacity-20"></div>
-        <div className="absolute top-32 right-16 w-16 h-16 bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-2xl opacity-30 rotate-45"></div>
-        <div className="absolute bottom-20 left-1/4 w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-500 rounded-full opacity-25"></div>
-        <div className="absolute bottom-32 right-1/3 w-14 h-14 bg-gradient-to-br from-green-400 to-green-500 rounded-2xl opacity-20 rotate-12"></div>
-        <div className="relative z-10">
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight text-gray-900 mb-6">
-            Step into the story as the 
-            <span className="bg-gradient-to-r from-orange-500 to-yellow-400 bg-clip-text text-transparent">hero</span>
+      <section className="relative min-h-screen flex items-center justify-center text-center overflow-hidden bg-[url('/images/cover.png')] bg-cover bg-center bg-no-repeat">
+        {/* Dark overlay for better text readability */}
+        <div className="absolute inset-0 opacity-30" style={{backgroundColor: 'rgba(0,0,0,0.3)'}}></div>
+        
+        <div className="relative z-10 px-6 sm:px-10 md:px-16 py-20 sm:py-28">
+          <h1 className="text-5xl sm:text-6xl md:text-7xl font-extrabold tracking-tight mb-6 drop-shadow-2xl">
+            <span className="text-white">Stories </span>
+            <span className="bg-gradient-to-r from-amber-400 to-yellow-400 bg-clip-text text-transparent">Alive!</span>
           </h1>
-          <p className="mt-5 text-lg text-gray-700 max-w-2xl mx-auto leading-relaxed">
-            Capture your face once and see yourself as the main character in an interactive story.
-            Private by default. Works on any modern device.
+          <p className="mt-5 text-xl sm:text-2xl text-white max-w-3xl mx-auto leading-relaxed drop-shadow-lg font-semibold">
+            Talk, Move & Be The Main Character
           </p>
+          <div className="mt-10">
+            <Link
+              href="/play/character"
+              className="px-8 py-4 bg-gradient-to-r from-amber-400 to-yellow-400 text-gray-900 font-bold rounded-full hover:shadow-lg transition-all duration-200 transform hover:scale-105 shadow-xl inline-block"
+            >
+              Get started
+            </Link>
+          </div>
         </div>
-        <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4 relative z-10">
-          <Link
-            href="/play/character"
-            className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white px-8 py-4 rounded-full text-lg font-semibold transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl"
+        
+        {/* Scroll Indicator */}
+        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce">
+          <svg 
+            className="w-8 h-8 text-white drop-shadow-lg" 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24" 
+            xmlns="http://www.w3.org/2000/svg"
           >
-            🚀 Get started
-          </Link>
-          <a
-            href="#how-it-works"
-            className="bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-gray-900 px-8 py-4 rounded-full text-lg font-semibold transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl"
-          >
-            ✨ See how it works
-          </a>
+            <path 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              strokeWidth={2} 
+              d="M19 14l-7 7m0 0l-7-7m7 7V3"
+            />
+          </svg>
         </div>
       </section>
 
       {/* Features */}
-      <section className="px-6 sm:px-10 md:px-16 py-16">
+      <section className="px-6 sm:px-10 md:px-16 py-20 bg-gradient-to-r from-purple-50 via-indigo-50 to-amber-50">
         <div className="mx-auto max-w-6xl">
-          <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">Why kids love our stories</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="bg-gradient-to-br from-orange-100 to-orange-200 rounded-3xl p-8 text-center transform hover:scale-105 transition-all duration-200">
-              <div className="w-16 h-16 bg-gradient-to-br from-orange-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                <span className="text-2xl">🎭</span>
+          <div className="flex flex-col lg:flex-row items-center justify-center gap-8 md:gap-12 lg:gap-16">
+            <div className="flex flex-col sm:flex-row items-center gap-4 w-full max-w-lg">
+              <img 
+                src="/images/hero.png" 
+                alt="Your face in the story"
+                className="w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48 object-cover flex-shrink-0"
+              />
+              <div className="text-center sm:text-left">
+                <h3 className="font-bold text-xl sm:text-2xl text-gray-900 mb-2">Your face in the story</h3>
+                <p className="text-gray-700 text-sm sm:text-base leading-relaxed">
+                  See yourself as the main character<br className="hidden sm:block"/>throughout every magical adventure.
+                </p>
               </div>
-              <h3 className="font-bold text-xl text-gray-900 mb-3">Your face in the story</h3>
-              <p className="text-gray-700 leading-relaxed">
-                See yourself as the main character throughout every magical adventure.
-              </p>
             </div>
-            <div className="bg-gradient-to-br from-yellow-100 to-yellow-200 rounded-3xl p-8 text-center transform hover:scale-105 transition-all duration-200">
-              <div className="w-16 h-16 bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                <span className="text-2xl">🔒</span>
+            <div className="flex flex-col sm:flex-row items-center gap-4 w-full max-w-lg">
+              <img 
+                src="/images/immersive.png" 
+                alt="Immersive experience"
+                className="w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48 object-cover flex-shrink-0"
+              />
+              <div className="text-center sm:text-left">
+                <h3 className="font-bold text-xl sm:text-2xl text-gray-900 mb-2">Immersive</h3>
+                <p className="text-gray-700 text-sm sm:text-base leading-relaxed">
+                  Listen, talk and move in the story.
+                </p>
               </div>
-              <h3 className="font-bold text-xl text-gray-900 mb-3">Private by default</h3>
-              <p className="text-gray-700 leading-relaxed">
-                Your photos stay safe on your device. Privacy first, always.
-              </p>
-            </div>
-            <div className="bg-gradient-to-br from-blue-100 to-blue-200 rounded-3xl p-8 text-center transform hover:scale-105 transition-all duration-200">
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-400 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                <span className="text-2xl">⚡</span>
-              </div>
-              <h3 className="font-bold text-xl text-gray-900 mb-3">Fast and fun</h3>
-              <p className="text-gray-700 leading-relaxed">
-                Instant stories that work perfectly on phones, tablets, and computers.
-              </p>
             </div>
           </div>
         </div>
       </section>
 
       {/* How it works */}
-      <section id="how-it-works" className="px-6 sm:px-10 md:px-16 py-20 bg-gradient-to-br from-green-50 to-blue-50 relative overflow-hidden">
-        {/* Decorative elements */}
-        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-green-300 to-green-400 rounded-full opacity-10 transform translate-x-16 -translate-y-16"></div>
-        <div className="absolute bottom-0 left-0 w-40 h-40 bg-gradient-to-br from-blue-300 to-blue-400 rounded-full opacity-10 transform -translate-x-20 translate-y-20"></div>
-        
-        <div className="mx-auto max-w-5xl relative z-10">
-          <h2 className="text-4xl font-bold text-center text-gray-900 mb-4">How it works</h2>
-          <p className="text-xl text-gray-700 text-center mb-12 max-w-3xl mx-auto">Three simple steps to become the hero of your own adventure</p>
+      <section id="how-it-works" className="px-6 sm:px-10 md:px-16 py-20 bg-gradient-to-br from-indigo-50 via-purple-50 to-amber-50">
+        <div className="mx-auto max-w-6xl">
+          <h2 className="text-4xl font-bold text-center text-gray-800 mb-12">How it works</h2>
           
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="text-center">
-              <div className="w-20 h-20 bg-gradient-to-br from-orange-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                <span className="text-3xl text-white font-bold">1</span>
-              </div>
-              <div className="bg-white rounded-2xl p-6 shadow-lg">
-                <h3 className="font-bold text-xl text-gray-900 mb-3">📸 Tell us about you</h3>
-                <p className="text-gray-700 leading-relaxed">Share your name, age, and take a quick selfie or choose a fun character.</p>
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+            <div>
+              <div className="text-5xl font-bold mb-6 bg-gradient-to-r from-indigo-900 to-purple-900 bg-clip-text text-transparent">01</div>
+              <h3 className="text-2xl font-bold mb-3 text-gray-900">Tell us about you</h3>
+              <p className="text-gray-600 leading-relaxed">
+                Share your name, age, and take a quick selfie or choose a fun character to represent you in the story.
+              </p>
             </div>
             
-            <div className="text-center">
-              <div className="w-20 h-20 bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                <span className="text-3xl text-gray-900 font-bold">2</span>
-              </div>
-              <div className="bg-white rounded-2xl p-6 shadow-lg">
-                <h3 className="font-bold text-xl text-gray-900 mb-3">✨ Pick your story</h3>
-                <p className="text-gray-700 leading-relaxed">Choose from age-appropriate adventures perfectly tailored for you.</p>
-              </div>
+            <div>
+              <div className="text-5xl font-bold mb-6 bg-gradient-to-r from-amber-500 to-orange-500 bg-clip-text text-transparent">02</div>
+              <h3 className="text-2xl font-bold mb-3 text-gray-900">Pick your story</h3>
+              <p className="text-gray-600 leading-relaxed">
+                Choose from age-appropriate adventures perfectly tailored for you, from magical quests to everyday adventures.
+              </p>
             </div>
             
-            <div className="text-center">
-              <div className="w-20 h-20 bg-gradient-to-br from-green-400 to-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                <span className="text-3xl text-white font-bold">3</span>
-              </div>
-              <div className="bg-white rounded-2xl p-6 shadow-lg">
-                <h3 className="font-bold text-xl text-gray-900 mb-3">🎮 Start your adventure</h3>
-                <p className="text-gray-700 leading-relaxed">Read, listen, and make choices as the hero of your personalized story!</p>
-              </div>
+            <div>
+              <div className="text-5xl font-bold mb-6 bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent">03</div>
+              <h3 className="text-2xl font-bold mb-3 text-gray-900">Start your adventure</h3>
+              <p className="text-gray-600 leading-relaxed">
+                Listen, talk, and move as the hero of your personalized story with immersive interactions.
+              </p>
             </div>
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="px-6 sm:px-10 md:px-16 py-12 bg-gradient-to-r from-orange-500 to-yellow-400">
+      <footer className="px-6 sm:px-10 md:px-16 py-12 bg-gradient-to-br from-indigo-900 via-purple-900 to-indigo-900">
         <div className="max-w-4xl mx-auto text-center">
           <div className="mb-6">
             <h3 className="text-2xl font-bold text-white mb-2">Ready for your adventure?</h3>
-            <p className="text-orange-100 mb-6">Join thousands of kids creating magical stories every day!</p>
+            <p className="text-purple-200 mb-6">Join thousands of kids creating magical stories every day!</p>
             <Link 
               href="/play/character" 
-              className="bg-white text-orange-600 px-8 py-3 rounded-full font-bold text-lg hover:bg-orange-50 transition-colors inline-block"
+              className="bg-gradient-to-r from-amber-400 to-yellow-400 text-gray-900 px-8 py-3 rounded-full font-bold text-lg hover:shadow-lg transition-all inline-block"
             >
-              Start Your Story Now! 🌟
+              Start Your Story Now!
             </Link>
           </div>
-          <div className="border-t border-orange-400 pt-6 text-orange-100 text-sm">
-            © {new Date().getFullYear()} Interactive Story. Made with ❤️ for curious minds.
+          <div className="border-t border-purple-700 pt-6 text-purple-200 text-sm">
+            © {new Date().getFullYear()} Interactive Story. Made by Pak.ai
           </div>
         </div>
       </footer>
