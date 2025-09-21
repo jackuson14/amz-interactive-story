@@ -146,6 +146,7 @@ export default function StoryPage() {
 
   // The End page state
   const [showTheEnd, setShowTheEnd] = useState(false);
+  const [celebrationHandsUpDetected, setCelebrationHandsUpDetected] = useState(false);
   
   // User interaction state for autoplay policy compliance
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
@@ -685,17 +686,61 @@ export default function StoryPage() {
                 What a wonderful bedtime story! All the animals at the zoo are now fast asleep,
                 and it&apos;s time for you to have sweet dreams too.
               </p>
-              <div className="space-y-4">
-                <p className="text-lg text-gray-600">
-                  Thank you for joining us on this magical journey! 🦁🐵🐧🦛
-                </p>
-                <button
-                  onClick={() => window.location.href = '/play/idea'}
-                  className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 px-8 rounded-xl text-lg transition-colors shadow-lg"
-                >
-                  📚 Choose Another Story
-                </button>
-              </div>
+              
+              {!celebrationHandsUpDetected ? (
+                <>
+                  {/* Hands up celebration section - shown before gesture */}
+                  <div className="mb-8 p-6 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-xl text-white animate-pulse">
+                    <p className="text-2xl font-bold mb-3">
+                      🙌 Time to Celebrate! 🙌
+                    </p>
+                    <p className="text-xl mb-4 font-semibold">
+                      Lift both hands up high to unlock another story!
+                    </p>
+                    <p className="text-sm opacity-90">
+                      Show the camera both your hands raised up like you're cheering!
+                    </p>
+                  </div>
+                  
+                  {/* Pose detection component for hands-up celebration */}
+                  <PoseDetection 
+                    isActive={true}
+                    detectionMode="handsUp"
+                    onHandsUpDetected={() => {
+                      console.log('🙌 Celebration hands up detected!');
+                      setCelebrationHandsUpDetected(true);
+                    }}
+                  />
+                  
+                  <p className="text-lg text-gray-600 mt-6">
+                    Raise both hands high to continue! 🙌
+                  </p>
+                </>
+              ) : (
+                <>
+                  {/* Success message after hands up */}
+                  <div className="mb-8 p-6 bg-gradient-to-r from-purple-400 to-pink-500 rounded-xl text-white">
+                    <p className="text-2xl font-bold mb-3">
+                      🌟 Amazing Celebration! 🌟
+                    </p>
+                    <p className="text-lg">
+                      You did it! Ready for another adventure?
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <p className="text-lg text-gray-600">
+                      Thank you for joining us on this magical journey! 🦁🐵🐧🦛
+                    </p>
+                    <button 
+                      onClick={() => window.location.href = '/play/idea'}
+                      className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 px-8 rounded-xl text-lg transition-all transform hover:scale-105 shadow-lg animate-bounce"
+                    >
+                      📚 Choose Another Story
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
