@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { SAMPLE_STORIES } from "@/data/stories";
@@ -21,6 +21,8 @@ const STORY_PROMPT_KEY = "story_prompt_v1";
 export default function StoryPage() {
   // Story page component
   const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [selfie, setSelfie] = useState(null);
   const [idx, setIdx] = useState(0);
   const [characterName, setCharacterName] = useState("Lily");
@@ -290,6 +292,25 @@ export default function StoryPage() {
     }
   }, [storyId, customScenes]);
 
+  // Ensure storyId is set from URL query on client/hydration and on param changes
+  useEffect(() => {
+    try {
+      if (!searchParams) return;
+      const id = searchParams.get('story');
+      const p = searchParams.get('prompt');
+
+      if (id && id !== storyId) {
+        setStoryId(id);
+        setIdx(0);
+        return;
+      }
+      if (!id && p && p.includes("Lily's Lost Smile") && storyId !== 'lily-lost-smile') {
+        setStoryId('lily-lost-smile');
+        setIdx(0);
+      }
+    } catch {}
+  }, [searchParams, storyId]);
+
   const storyTitle = useMemo(() => {
     // For The Lost Smile, just use the generic title
     if (storyId === "lily-lost-smile") {
@@ -365,25 +386,25 @@ export default function StoryPage() {
           const cacheBuster = Date.now();
           const response = await fetch(`${story.markdownPath}?v=${cacheBuster}`);
           console.log('Fetch response status:', response.status);
-          
+
           if (!response.ok) {
             throw new Error(`Failed to load story: ${response.status} ${response.statusText}`);
           }
-          
+
           const markdownContent = await response.text();
           console.log('Markdown content length:', markdownContent.length);
-          
+
           if (!markdownContent || markdownContent.length === 0) {
             throw new Error('Story content is empty');
           }
-          
+
           const parsedStory = parseMarkdownStory(markdownContent, characterName, characterGender);
           console.log('Parsed story:', parsedStory);
-          
+
           if (!parsedStory || !parsedStory.scenes || parsedStory.scenes.length === 0) {
             throw new Error('Failed to parse story content');
           }
-          
+
           setMarkdownStory(parsedStory);
           setMarkdownLoadError(null); // Clear any previous errors
         } catch (error) {
@@ -884,7 +905,7 @@ export default function StoryPage() {
               className="object-cover"
               unoptimized
             />
-            
+
             {/* Back button - top left corner */}
             <div className="absolute top-6 left-6 z-20">
               <Link
@@ -1182,7 +1203,7 @@ export default function StoryPage() {
                 </div>
               </div>
             )}
-            
+
             {/* Back button - top left corner */}
             <div className="absolute top-6 left-6 z-20">
               <Link
