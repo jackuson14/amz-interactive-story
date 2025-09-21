@@ -365,10 +365,18 @@ export default function StoryPage() {
       const characterRaw = localStorage.getItem(CHARACTER_KEY);
       if (characterRaw) {
         const characterData = JSON.parse(characterRaw);
-        if (characterData?.name) setCharacterName(characterData.name);
-        if (characterData?.gender) setCharacterGender(characterData.gender);
+        if (characterData?.name) {
+          setCharacterName(characterData.name);
+          console.log('Loaded character name:', characterData.name);
+        }
+        if (characterData?.gender) {
+          setCharacterGender(characterData.gender);
+          console.log('Loaded character gender:', characterData.gender);
+        }
       }
-    } catch {}
+    } catch (e) {
+      console.error('Error loading character data:', e);
+    }
   }, []);
 
   // Load markdown story content
@@ -924,7 +932,6 @@ export default function StoryPage() {
           <div className="w-1/2 bg-gradient-to-br from-purple-50 to-pink-50 flex flex-col justify-center p-12 overflow-y-auto">
               {/* Story content */}
               <div className="max-w-xl mx-auto">
-                <h2 className="text-3xl font-bold text-gray-800 mb-6">{current.title || 'Story Time'}</h2>
                 <p className="text-xl leading-relaxed mb-6 text-gray-700">{current.text}</p>
 
 
@@ -1137,7 +1144,6 @@ export default function StoryPage() {
               </div>
             ) : (
               <div className="max-w-xl mx-auto">
-                <h2 className="text-3xl font-bold text-gray-800 mb-6">{current.title || storyTitle}</h2>
                 <p className="text-xl leading-relaxed mb-6 text-gray-700">{current.text}</p>
 
                   {(() => {

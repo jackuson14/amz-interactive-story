@@ -89,7 +89,7 @@ export default function PlayAppearancePage() {
   const [characterGender, setCharacterGender] = useState("");
   
   // Character type selection
-  const [characterType, setCharacterType] = useState("selfie"); // "selfie" or "preset"
+  const [characterType, setCharacterType] = useState("preset"); // "selfie" or "preset"
   const [selectedPresetCharacter, setSelectedPresetCharacter] = useState(null);
 
   // Selfie state
