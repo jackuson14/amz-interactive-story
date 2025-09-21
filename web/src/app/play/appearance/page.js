@@ -263,7 +263,6 @@ export default function PlayAppearancePage() {
                     <Image
                       src={(() => {
                         // Convert path from thumbnail to full body image
-                        // e.g., /images/3-4yo/Female-Artboard 1.jpg -> /images/3-4yo/Female-Artboard1_full.png
                         const basePath = selectedPresetCharacter.path;
                         const pathParts = basePath.split('/');
                         const filename = pathParts[pathParts.length - 1];
@@ -273,7 +272,15 @@ export default function PlayAppearancePage() {
                         const match = filename.match(/(Female|Male)-Artboard (\d+)/);
                         if (match) {
                           const [, gender, number] = match;
-                          return `${folderPath}/${gender}-Artboard${number}_full.png`;
+                          // Handle inconsistent naming: some have space before number, some don't
+                          // Try with space first, then without
+                          if ([1, 4].includes(parseInt(number))) {
+                            // These don't have spaces
+                            return `${folderPath}/${gender}-Artboard${number}_full.png`;
+                          } else {
+                            // These have spaces
+                            return `${folderPath}/${gender}-Artboard ${number}_full.png`;
+                          }
                         }
                         return basePath; // Fallback to original if pattern doesn't match
                       })()}
