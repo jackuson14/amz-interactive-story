@@ -41,12 +41,12 @@ export async function POST(request) {
 
     // Phase 1: text-only to get structured JSON scenes
     const config = {
-      responseModalities: [
+      response_modalities: [
         'TEXT',
       ],
     };
 
-    const model = 'gemini-2.5-flash-image-preview';
+    const model = 'models/gemini-2.5-flash-image-preview';
 
     // Prepare personalization from character if provided
     const personalizationText = character && (character.name || character.age || character.gender)
@@ -182,7 +182,10 @@ export async function POST(request) {
       results.scenes = structuredScenes;
       // Phase 2: Generate exactly one image per scene sequentially to ensure correct alignment
       if (Array.isArray(results.scenes) && results.scenes.length > 0) {
-        const imgConfig = { responseModalities: ['IMAGE'] };
+        const imgConfig = { 
+          response_modalities: ['IMAGE'],
+          response_mime_type: 'image/jpeg'
+        };
         for (let i = 0; i < results.scenes.length; i++) {
           const scene = results.scenes[i];
           const sceneTitle = scene?.title || `Scene ${i + 1}`;
@@ -204,23 +207,42 @@ export async function POST(request) {
           }
 
           try {
+            console.log(`Generating image for scene ${i + 1}...`);
             const imgResp = await ai.models.generateContent({
               model,
               config: imgConfig,
               contents: [{ role: 'user', parts: imgParts }]
             });
+            
+            console.log(`Image response for scene ${i + 1}:`, {
+              hasResponse: !!imgResp,
+              hasCandidates: !!imgResp?.candidates,
+              candidatesLength: imgResp?.candidates?.length,
+              firstCandidate: !!imgResp?.candidates?.[0],
+              hasContent: !!imgResp?.candidates?.[0]?.content,
+              hasParts: !!imgResp?.candidates?.[0]?.content?.parts,
+              partsLength: imgResp?.candidates?.[0]?.content?.parts?.length
+            });
+            
             let dataUrl = null;
             const cand = imgResp?.candidates?.[0];
             const parts = cand?.content?.parts || [];
             for (const p of parts) {
               if (p.inlineData?.data && p.inlineData?.mimeType) {
                 dataUrl = `data:${p.inlineData.mimeType};base64,${p.inlineData.data}`;
+                console.log(`Found image data for scene ${i + 1}, mimeType: ${p.inlineData.mimeType}`);
                 break;
               }
             }
+            
+            if (!dataUrl) {
+              console.warn(`No image data found in response for scene ${i + 1}`);
+            }
+            
             results.scenes[i] = { ...scene, image: dataUrl };
           } catch (e) {
-            console.warn(`Image generation failed for scene ${i + 1}:`, e?.message || e);
+            console.error(`Image generation failed for scene ${i + 1}:`, e);
+            console.error('Full error:', JSON.stringify(e, null, 2));
             results.scenes[i] = { ...scene, image: scene.image || null };
           }
         }

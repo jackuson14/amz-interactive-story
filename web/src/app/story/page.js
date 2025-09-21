@@ -108,7 +108,7 @@ export default function StoryPage() {
       }
 
       if (expectedKeyword && lowerTranscript.includes(expectedKeyword)) {
-        if (expectedKeyword === 'goodnight' && idx === scenes.length - 1) {
+        if ((expectedKeyword === 'goodnight' || expectedKeyword === 'the end') && idx === scenes.length - 1) {
           setShowTheEnd(true);
           setVoiceError('');
         } else {
@@ -436,9 +436,16 @@ export default function StoryPage() {
   const current = scenes[idx];
   // Prefer explicit scene keyword when available; fallback to parsing text
   const getExpectedKeyword = () => {
-    // Do not use voice keywords on the last scene; last scene uses jump interaction
-    if (idx === scenes.length - 1) return null;
     const page = scenes[idx];
+    
+    // For last scene, only skip keywords if it's a jump detection story (goodnight-zoo)
+    if (idx === scenes.length - 1) {
+      // Jump detection stories don't need keywords on last page
+      if (storyId === "goodnight-zoo") return null;
+      // For AI stories and other stories, use "the end" as the keyword
+      return "the end";
+    }
+    
     if (page?.keyword) {
       const normalize = (s) => String(s)
         .toLowerCase()
@@ -472,12 +479,17 @@ export default function StoryPage() {
     navigationInProgress.current = true;
     lastNavigationTime.current = now;
 
-    console.log('📄 Navigating to next page', {
-      currentPage: idx,
-      nextPage: Math.min(idx + 1, scenes.length - 1)
-    });
-
-    setIdx((v) => Math.min(v + 1, scenes.length - 1));
+    // Check if we're on the last page
+    if (idx === scenes.length - 1) {
+      console.log('📄 On last page - showing The End');
+      setShowTheEnd(true);
+    } else {
+      console.log('📄 Navigating to next page', {
+        currentPage: idx,
+        nextPage: idx + 1
+      });
+      setIdx((v) => Math.min(v + 1, scenes.length - 1));
+    }
 
     // Reset navigation flag after a delay
     setTimeout(() => {
@@ -662,9 +674,16 @@ export default function StoryPage() {
       // Create story text with character name replacement (title removed from UI, so don't include in speech)
       const personalizedText = current.text.replace(/Lily/g, characterName);
 
-      // Append the voice instruction at the end (for non-final scenes)
+      // Append the voice instruction at the end
       const kw = getExpectedKeyword();
-      const instructionToSpeak = kw ? (current.instruction || `Say "${kw}" to go to the next page.`) : null;
+      let instructionToSpeak = null;
+      if (kw) {
+        if (idx === scenes.length - 1 && kw === "the end") {
+          instructionToSpeak = `Say "the end" to finish the story.`;
+        } else {
+          instructionToSpeak = current.instruction || `Say "${kw}" to go to the next page.`;
+        }
+      }
       const finalText = instructionToSpeak ? `${personalizedText} ${instructionToSpeak}` : personalizedText;
 
       // Stop current audio and synthesize new speech
@@ -771,6 +790,22 @@ export default function StoryPage() {
 
 
 
+  // Auto-play TTS when showing The End page
+  useEffect(() => {
+    if (showTheEnd && hasUserInteracted) {
+      const endMessage = storyId === "goodnight-zoo" 
+        ? "The End! What a wonderful bedtime story! All the animals at the zoo are now fast asleep, and it's time for you to have sweet dreams too. Great job! Now, lift both hands up high to unlock another story!"
+        : "The End! What an amazing adventure! You've completed the story. Great job! Now, lift both hands up high to unlock another story!";
+      
+      // Small delay to ensure page is rendered
+      const timer = setTimeout(() => {
+        tts.synthesizeAndPlay(endMessage);
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [showTheEnd, hasUserInteracted, storyId, tts]);
+
   // Handle "The End" page
   if (showTheEnd) {
     return (
@@ -782,8 +817,9 @@ export default function StoryPage() {
                 🌟 The End 🌟
               </h1>
               <p className="text-xl md:text-2xl text-gray-700 mb-8">
-                What a wonderful bedtime story! All the animals at the zoo are now fast asleep,
-                and it&apos;s time for you to have sweet dreams too.
+                {storyId === "goodnight-zoo" 
+                  ? "What a wonderful bedtime story! All the animals at the zoo are now fast asleep, and it's time for you to have sweet dreams too."
+                  : "What an amazing adventure! You've completed the story."}
               </p>
 
               {!celebrationHandsUpDetected ? (
@@ -808,6 +844,8 @@ export default function StoryPage() {
                     onHandsUpDetected={() => {
                       console.log('🙌 Celebration hands up detected!');
                       setCelebrationHandsUpDetected(true);
+                      // Play celebration TTS
+                      tts.synthesizeAndPlay("Amazing celebration! You did it! Ready for another adventure? Thank you for joining us on this magical journey!");
                     }}
                   />
 
@@ -1040,11 +1078,16 @@ export default function StoryPage() {
 
                 {(() => {
                   const kw = getExpectedKeyword();
-                  return kw ? (
+                  if (!kw) return null;
+                  const isLastPage = idx === scenes.length - 1;
+                  const instruction = isLastPage && kw === "the end" 
+                    ? `Say "the end" to finish the story`
+                    : `Say "${kw}" to go to the next page`;
+                  return (
                     <div className="mb-4 p-4 bg-blue-100 rounded-lg border-2 border-blue-300">
-                      <p className="text-blue-800 text-lg font-bold text-center">Say &quot;{kw}&quot; to go to the next page</p>
+                      <p className="text-blue-800 text-lg font-bold text-center">{instruction}</p>
                     </div>
-                  ) : null;
+                  );
                 })()}
 
                 {/* Final scene jump instruction */}
@@ -1184,7 +1227,7 @@ export default function StoryPage() {
                       )}
                   </div>
 
-                  <button onClick={next} disabled={idx === scenes.length - 1} className="w-full sm:w-auto rounded-md bg-indigo-600 text-white px-5 py-3 text-lg disabled:opacity-40 hover:bg-indigo-500">Next</button>
+                  <button onClick={next} className="w-full sm:w-auto rounded-md bg-indigo-600 text-white px-5 py-3 text-lg hover:bg-indigo-500">{idx === scenes.length - 1 ? 'Finish' : 'Next'}</button>
                 </div>
               </div>
             </div>
@@ -1242,11 +1285,16 @@ export default function StoryPage() {
 
                   {(() => {
                     const kw = getExpectedKeyword();
-                    return kw ? (
+                    if (!kw) return null;
+                    const isLastPage = idx === scenes.length - 1;
+                    const instruction = isLastPage && kw === "the end" 
+                      ? `Say "the end" to finish the story`
+                      : `Say "${kw}" to go to the next page`;
+                    return (
                       <div className="mt-4 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
-                        <p className="text-blue-800 text-lg font-bold text-center">Say &quot;{kw}&quot; to go to the next page</p>
+                        <p className="text-blue-800 text-lg font-bold text-center">{instruction}</p>
                       </div>
-                    ) : null;
+                    );
                   })()}
 
 
@@ -1387,7 +1435,7 @@ export default function StoryPage() {
                       )}
                   </div>
 
-                  <button onClick={next} disabled={idx === scenes.length - 1} className="w-full sm:w-auto rounded-md bg-indigo-600 text-white px-5 py-3 text-lg disabled:opacity-40 hover:bg-indigo-500">Next</button>
+                  <button onClick={next} className="w-full sm:w-auto rounded-md bg-indigo-600 text-white px-5 py-3 text-lg hover:bg-indigo-500">{idx === scenes.length - 1 ? 'Finish' : 'Next'}</button>
                 </div>
               </div>
             )}
