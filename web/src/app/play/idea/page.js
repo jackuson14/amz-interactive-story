@@ -193,7 +193,7 @@ export default function PlayIdeaPage() {
               <div className="space-y-4 mb-6">
                 {/* About the Story */}
                 <div className="border-l-4 border-indigo-400 pl-4">
-                  <h4 className="font-bold text-sm text-gray-600 mb-1">📖 What's this story about?</h4>
+                  <h4 className="font-bold text-sm text-gray-600 mb-1">📖 What&apos;s this story about?</h4>
                   <p className="text-gray-800 font-medium">
                     {selectedStory.about || selectedStory.description || selectedStory.oneLiner}
                   </p>
