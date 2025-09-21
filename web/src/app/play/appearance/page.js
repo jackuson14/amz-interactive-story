@@ -100,9 +100,7 @@ export default function PlayAppearancePage() {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
 
-  // Character generation state
-  const [generatedCharacter, setGeneratedCharacter] = useState(null);
-  const [isGenerating, setIsGenerating] = useState(false);
+  // Removed character generation state - no longer needed
 
   // Load existing data from storage
   useEffect(() => {
@@ -201,37 +199,10 @@ export default function PlayAppearancePage() {
 
   const clearSelfie = () => {
     setSelfie(null);
-    setGeneratedCharacter(null);
     try { localStorage.removeItem(SELFIE_KEY); } catch {}
   };
 
-  // Generate cartoon character from selfie (dummy implementation)
-  const generateCharacter = async () => {
-    if (!selfie) return;
-    
-    setIsGenerating(true);
-    
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Dummy character generation - in real implementation, this would call an AI service
-    const dummyCharacters = [
-      "/stories/zoo/char/boy1.png",
-      "/stories/zoo/char/boy2.png",
-      // Add more dummy character options here
-    ];
-    
-    const randomCharacter = dummyCharacters[Math.floor(Math.random() * dummyCharacters.length)];
-    
-    const generatedChar = {
-      url: randomCharacter,
-      originalPhoto: selfie.url,
-      generated: true
-    };
-    
-    setGeneratedCharacter(generatedChar);
-    setIsGenerating(false);
-  };
+  // Removed generateCharacter function - no longer needed
 
   useEffect(() => {
     return () => {
@@ -258,7 +229,7 @@ export default function PlayAppearancePage() {
     } catch {}
   }, [characterType, selectedPresetCharacter, characterName, characterAge, characterGender]);
 
-  const canProceed = (characterType === "selfie" && generatedCharacter) || (characterType === "preset" && selectedPresetCharacter);
+  const canProceed = (characterType === "selfie" && selfie) || (characterType === "preset" && selectedPresetCharacter);
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-orange-50 via-yellow-50 to-green-50">
@@ -376,63 +347,15 @@ export default function PlayAppearancePage() {
                         </div>
                       )}
                     </div>
-                    {selfie && !generatedCharacter && (
-                      <div className="mt-4 space-y-2">
-                        <button 
-                          onClick={generateCharacter}
-                          disabled={isGenerating}
-                          className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-6 py-3 rounded-full font-bold transition-all transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {isGenerating ? (
-                            <span className="flex items-center justify-center gap-2">
-                              <span className="animate-spin">🎨</span>
-                              Generating Character...
-                            </span>
-                          ) : (
-                            <span className="flex items-center justify-center gap-2">
-                              <span>✨</span>
-                              Generate Character
-                            </span>
-                          )}
-                        </button>
+                    {selfie && (
+                      <div className="mt-4">
                         <button onClick={clearSelfie} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100">
                           Retake Photo
                         </button>
                       </div>
                     )}
-                    {generatedCharacter && (
-                      <div className="mt-4">
-                        <button onClick={clearSelfie} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                          Start Over
-                        </button>
-                      </div>
-                    )}
                   </div>
 
-                  {/* Generated Character Display */}
-                  {generatedCharacter && (
-                    <div>
-                      <h4 className="font-medium mb-2 text-gray-900">Your Character</h4>
-                      <div className="mt-2">
-                        <Image 
-                          src={generatedCharacter.url} 
-                          alt="Generated character" 
-                          width={256} 
-                          height={256} 
-                          className="w-64 h-auto rounded border ring-4 ring-purple-300 shadow-lg" 
-                          unoptimized
-                        />
-                      </div>
-                      <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                        <p className="text-sm text-green-800 font-medium">
-                          🎉 Character Generated Successfully!
-                        </p>
-                        <p className="text-xs text-green-600 mt-1">
-                          This cartoon version of you will appear in your stories!
-                        </p>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             )}
@@ -481,13 +404,13 @@ export default function PlayAppearancePage() {
 
             {/* Next Button */}
             <div className="mt-12 text-center">
-              {!canProceed && characterType === "selfie" && selfie && !generatedCharacter && (
+              {!canProceed && characterType === "selfie" && !selfie && (
                 <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                   <p className="text-yellow-800 font-medium">
-                    📸 Generate your character to continue!
+                    📸 Take a photo to continue!
                   </p>
                   <p className="text-yellow-600 text-sm mt-1">
-                    Click the &quot;Generate Character&quot; button above to create your cartoon version.
+                    Capture your selfie to appear in the story.
                   </p>
                 </div>
               )}
