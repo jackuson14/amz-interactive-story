@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 
-const PoseDetection = ({ onJumpDetected, isActive = false }) => {
+const PoseDetection = ({ onJumpDetected, onHandsUpDetected, isActive = false, detectionMode = 'jump' }) => {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const poseLandmarkerRef = useRef(null);
@@ -176,6 +176,54 @@ const PoseDetection = ({ onJumpDetected, isActive = false }) => {
     }
   }, [isActive]);
 
+  // Hands-up detection for celebration
+  const detectHandsUp = useCallback((landmarks) => {
+    if (!landmarks || landmarks.length === 0) return false;
+    
+    // Get relevant landmarks for hands-up detection
+    const leftWrist = landmarks[15];  // Left wrist
+    const rightWrist = landmarks[16]; // Right wrist
+    const leftElbow = landmarks[13];  // Left elbow
+    const rightElbow = landmarks[14]; // Right elbow
+    const leftShoulder = landmarks[11]; // Left shoulder
+    const rightShoulder = landmarks[12]; // Right shoulder
+    const nose = landmarks[0]; // Nose (head position)
+    
+    if (!leftWrist || !rightWrist || !leftElbow || !rightElbow || !leftShoulder || !rightShoulder) {
+      setJumpStatus('Show your arms to the camera');
+      setDetectedLandmarks('Arms not fully visible');
+      return false;
+    }
+    
+    setDetectedLandmarks('Arms detected ✓');
+    
+    // Check if both hands are raised above shoulders
+    const leftHandRaised = leftWrist.y < leftShoulder.y - 0.1; // Left hand above shoulder
+    const rightHandRaised = rightWrist.y < rightShoulder.y - 0.1; // Right hand above shoulder
+    
+    // Check if elbows are also raised (more confident gesture)
+    const leftElbowRaised = leftElbow.y < leftShoulder.y;
+    const rightElbowRaised = rightElbow.y < rightShoulder.y;
+    
+    // Debug info
+    const leftHeight = (leftShoulder.y - leftWrist.y).toFixed(3);
+    const rightHeight = (rightShoulder.y - rightWrist.y).toFixed(3);
+    setDebugInfo(`L: ${leftHeight}, R: ${rightHeight}`);
+    
+    // Both hands must be raised above shoulders
+    if (leftHandRaised && rightHandRaised && leftElbowRaised && rightElbowRaised) {
+      setJumpStatus('🙌 Hands up detected! Great job! 🎉');
+      setTimeout(() => setJumpStatus(''), 2000);
+      return true;
+    } else if (leftHandRaised || rightHandRaised) {
+      setJumpStatus('Almost there! Raise both hands high! 🙌');
+    } else {
+      setJumpStatus('Lift both hands up high to celebrate! 🙌');
+    }
+    
+    return false;
+  }, []);
+
   // Shoulder-based jump detection for deliberate jumping movements
   const detectJump = useCallback((landmarks) => {
     if (!landmarks || landmarks.length === 0) return false;
@@ -340,10 +388,18 @@ const PoseDetection = ({ onJumpDetected, isActive = false }) => {
           // Draw pose landmarks
           drawLandmarks(ctx, landmarks, canvas.width, canvas.height);
           
-          // Check for jump
-          if (detectJump(landmarks)) {
-            console.log('🦘 Jump detected, triggering progression!');
-            onJumpDetected?.();
+          // Check for appropriate gesture based on detection mode
+          if (detectionMode === 'handsUp') {
+            if (detectHandsUp(landmarks)) {
+              console.log('🙌 Hands up detected, triggering action!');
+              onHandsUpDetected?.();
+            }
+          } else {
+            // Default to jump detection
+            if (detectJump(landmarks)) {
+              console.log('🦘 Jump detected, triggering progression!');
+              onJumpDetected?.();
+            }
           }
         } else {
           // No pose detected - more detailed debugging
