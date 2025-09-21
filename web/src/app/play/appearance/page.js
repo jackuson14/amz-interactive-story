@@ -238,6 +238,13 @@ export default function PlayAppearancePage() {
 
   return (
     <main className="min-h-screen">
+      {/* Informational Banner */}
+      <div className="w-full bg-gradient-to-r from-amber-400 to-yellow-400 text-gray-900 py-2 px-4 text-center">
+        <p className="text-sm font-medium">
+          ℹ️ You can use your own photo or choose a character. For best preset character choose the first boy.
+        </p>
+      </div>
+      
       <section>
         <div className="mx-auto max-w-full">
           <div className="grid grid-cols-1 lg:grid-cols-2">
@@ -309,6 +316,17 @@ export default function PlayAppearancePage() {
             <div className="mb-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <button
+                  onClick={() => setCharacterType("preset")}
+                  className={`p-8 rounded-2xl border-3 text-left transition-all duration-200 transform hover:scale-105 ${
+                    characterType === "preset"
+                      ? "border-green-400 bg-gradient-to-br from-green-50 to-blue-50 shadow-lg"
+                      : "border-gray-200 bg-white hover:border-green-200 shadow-md hover:shadow-lg"
+                  }`}
+                >
+                  <h3 className="text-xl font-bold mb-3 text-gray-900">🎭 Choose Character</h3>
+                  <p className="text-gray-700">Pick from our collection of fun characters!</p>
+                </button>
+                <button
                   onClick={async () => {
                     setCharacterType("selfie");
                     // Request camera permission when selecting selfie mode
@@ -324,17 +342,6 @@ export default function PlayAppearancePage() {
                 >
                   <h3 className="text-xl font-bold mb-3 text-gray-900">📸 Use My Photo</h3>
                   <p className="text-gray-700">Take a selfie to appear as yourself in the story!</p>
-                </button>
-                <button
-                  onClick={() => setCharacterType("preset")}
-                  className={`p-8 rounded-2xl border-3 text-left transition-all duration-200 transform hover:scale-105 ${
-                    characterType === "preset"
-                      ? "border-green-400 bg-gradient-to-br from-green-50 to-blue-50 shadow-lg"
-                      : "border-gray-200 bg-white hover:border-green-200 shadow-md hover:shadow-lg"
-                  }`}
-                >
-                  <h3 className="text-xl font-bold mb-3 text-gray-900">🎭 Choose Character</h3>
-                  <p className="text-gray-700">Pick from our collection of fun characters!</p>
                 </button>
               </div>
             </div>

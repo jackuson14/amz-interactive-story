@@ -50,6 +50,13 @@ export default function PlayIdeaPage() {
 
   return (
     <main className="min-h-screen">
+      {/* Informational Banner */}
+      <div className="w-full bg-gradient-to-r from-amber-400 to-yellow-400 text-gray-900 py-2 px-4 text-center">
+        <p className="text-sm font-medium">
+          ℹ️ Stories are personalised based on kids' age. We have preset 1 story for now.
+        </p>
+      </div>
+      
       <section>
         <div className="mx-auto max-w-full">
           <div className="grid grid-cols-1 lg:grid-cols-2">
