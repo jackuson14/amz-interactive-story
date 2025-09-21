@@ -22,13 +22,13 @@ export async function POST(request) {
       );
     }
 
-    // Check for GEMINI_API_KEY environment variable
-    const apiKey = process.env.GEMINI_API_KEY;
+    // Check for APP_GEMINI_API_KEY environment variable
+    const apiKey = process.env.APP_GEMINI_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
         {
           status: "error",
-          error: "GEMINI_API_KEY environment variable is not set"
+          error: "APP_GEMINI_API_KEY environment variable is not set"
         },
         { status: 500 }
       );
