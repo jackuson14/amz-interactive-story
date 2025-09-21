@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { SAMPLE_STORIES } from "@/data/stories";
@@ -21,7 +21,7 @@ const STORY_PROMPT_KEY = "story_prompt_v1";
 export default function StoryPage() {
   // Story page component
   const router = useRouter();
-  const searchParams = useSearchParams();
+
 
   const [selfie, setSelfie] = useState(null);
   const [idx, setIdx] = useState(0);
@@ -295,9 +295,10 @@ export default function StoryPage() {
   // Ensure storyId is set from URL query on client/hydration and on param changes
   useEffect(() => {
     try {
-      if (!searchParams) return;
-      const id = searchParams.get('story');
-      const p = searchParams.get('prompt');
+      if (typeof window === 'undefined') return;
+      const qs = new URLSearchParams(window.location.search);
+      const id = qs.get('story');
+      const p = qs.get('prompt');
 
       if (id && id !== storyId) {
         setStoryId(id);
@@ -309,7 +310,7 @@ export default function StoryPage() {
         setIdx(0);
       }
     } catch {}
-  }, [searchParams, storyId]);
+  }, [storyId]);
 
   const storyTitle = useMemo(() => {
     // For The Lost Smile, just use the generic title
