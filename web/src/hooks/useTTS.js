@@ -15,6 +15,7 @@ export const useTTS = (options = {}) => {
   
   const audioRef = useRef(null);
   const progressInterval = useRef(null);
+  const progressUpdateRef = useRef(null);
   const [volume, setVolumeState] = useState(0.9); // Default to 90% volume (louder)
 
   // Load available voices on mount
@@ -31,6 +32,9 @@ export const useTTS = (options = {}) => {
       }
       if (progressInterval.current) {
         clearInterval(progressInterval.current);
+      }
+      if (progressUpdateRef.current) {
+        cancelAnimationFrame(progressUpdateRef.current);
       }
     };
   }, []);
@@ -110,9 +114,14 @@ export const useTTS = (options = {}) => {
       });
 
       audio.addEventListener('timeupdate', () => {
-        if (audio.duration) {
-          setProgress((audio.currentTime / audio.duration) * 100);
+        if (progressUpdateRef.current) {
+          cancelAnimationFrame(progressUpdateRef.current);
         }
+        progressUpdateRef.current = requestAnimationFrame(() => {
+          if (audio.duration) {
+            setProgress((audio.currentTime / audio.duration) * 100);
+          }
+        });
       });
 
       audio.addEventListener('ended', () => {
