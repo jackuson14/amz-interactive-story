@@ -196,7 +196,7 @@ export default function PlayIdeaPage() {
                         Specially Curated for {characterAge}-Year-Olds
                       </h3>
                       <p className="text-sm text-gray-600 mb-4">
-                        Expert-selected topics and stories designed specifically for your child's developmental stage
+                        Expert-selected topics and stories designed specifically for your child&apos;s developmental stage
                       </p>
                       <div className="flex flex-wrap gap-2">
                         {(TOPICS_BY_AGE[characterAge] || DEFAULT_TOPICS).map((topic) => (
@@ -328,7 +328,7 @@ export default function PlayIdeaPage() {
                                     <div className="space-y-4 text-left">
                                       {/* About the Story */}
                                       <div className="border-l-4 border-purple-400 pl-4">
-                                        <h4 className="font-bold text-sm text-gray-800 mb-1">What's this story about?</h4>
+                                        <h4 className="font-bold text-sm text-gray-800 mb-1">What&apos;s this story about?</h4>
                                         <p className="text-gray-700 text-sm">
                                           {selectedStory.about || selectedStory.description || selectedStory.oneLiner}
                                         </p>
@@ -396,7 +396,7 @@ export default function PlayIdeaPage() {
                       />
                       <div className="mt-4 space-y-2">
                         <p className="text-sm font-medium text-gray-700">💡 Age-appropriate story ideas for {characterAge}-year-olds:</p>
-                        <p className="text-xs text-gray-500">These topics are specially selected for your child's developmental stage</p>
+                        <p className="text-xs text-gray-500">These topics are specially selected for your child&apos;s developmental stage</p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
                           <button
                             onClick={() => setStoryPrompt("A story about making new friends at school")}
