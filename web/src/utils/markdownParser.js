@@ -44,7 +44,8 @@ export function parseMarkdownStory(markdownContent, characterName = "Lily", char
     const line = lines[i].trim();
     
     // Check for page headers (both ## and ### formats)
-    const pageMatch = line.match(/^#{2,3} Page (\d+): (.+)$/);
+    // Handle both "Page X: Title" and "Page X:" formats
+    const pageMatch = line.match(/^#{2,3} Page (\d+):?\s*(.*)$/);
     if (pageMatch) {
       // Save previous scene if exists
       if (currentScene) {
@@ -53,9 +54,10 @@ export function parseMarkdownStory(markdownContent, characterName = "Lily", char
       
       // Start new scene
       const pageNum = parseInt(pageMatch[1]);
+      const pageTitle = pageMatch[2] || `Page ${pageNum}`;
       currentScene = {
         id: `page${pageNum}`,
-        title: pageMatch[2],
+        title: pageTitle,
         text: '',
         image: '', // Remove image for zoo stories to use background instead
         bg: isZooStory ? getZooBackground(pageNum) : getBackgroundForPage(pageNum)
@@ -96,11 +98,17 @@ export function parseMarkdownStory(markdownContent, characterName = "Lily", char
     
     // Add to current scene text
     if (currentScene && line) {
+      // Strip leading and trailing quotes if present
+      let cleanLine = line;
+      if (cleanLine.startsWith('"') && cleanLine.endsWith('"')) {
+        cleanLine = cleanLine.slice(1, -1);
+      }
+      
       if (currentScene.text) {
         currentScene.text += ' ';
       }
       // Replace names and pronouns based on character
-      currentScene.text += replacePronounsAndGender(line, characterName, characterGender);
+      currentScene.text += replacePronounsAndGender(cleanLine, characterName, characterGender);
     }
   }
   

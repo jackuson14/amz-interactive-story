@@ -31,7 +31,7 @@ const generateStoryAPI = async ({ prompt, systemPrompt, selfie, character }) => 
 
 const parseStoryIntoScenes = (generatedText, images) => {
   // Simple parsing - split by common scene indicators
-  const sceneTexts = generatedText.split(/(?:Scene \d+|Chapter \d+|^\d+\.)/i).filter(text => text.trim());
+  const sceneTexts = generatedText.split(/(?:Scene \d+|Chapter \d+|^\d+\.)/im).filter(text => text.trim());
 
   // Create scenes in the format expected by the story page
   const scenes = [];
@@ -40,12 +40,13 @@ const parseStoryIntoScenes = (generatedText, images) => {
     'from-sky-100 via-indigo-100 to-fuchsia-100',
     'from-emerald-100 via-teal-100 to-cyan-100',
     'from-lime-100 via-emerald-100 to-teal-100',
-    'from-pink-100 via-rose-100 to-amber-100'
+    'from-pink-100 via-rose-100 to-amber-100',
+    'from-slate-100 via-gray-100 to-sky-100'
   ];
 
   // If we have structured text, use it; otherwise create default scenes
-  if (sceneTexts.length >= 3) {
-    sceneTexts.slice(0, 3).forEach((text, index) => {
+  if (sceneTexts.length >= 6) {
+    sceneTexts.slice(0, 6).forEach((text, index) => {
       const lines = text.trim().split('\n').filter(line => line.trim());
       const title = lines[0]?.replace(/[*#]/g, '').trim() || `Scene ${index + 1}`;
       const content = lines.slice(1).join(' ').trim() || text.trim();
@@ -59,15 +60,15 @@ const parseStoryIntoScenes = (generatedText, images) => {
       });
     });
   } else {
-    // Fallback: create 3 scenes from the full text
+    // Fallback: create 6 scenes from the full text
     const fullText = generatedText.trim();
     const sentences = fullText.split(/[.!?]+/).filter(s => s.trim());
-    const sentencesPerScene = Math.max(1, Math.floor(sentences.length / 3));
+    const sentencesPerScene = Math.max(1, Math.floor(sentences.length / 6));
 
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 6; i++) {
       const startIdx = i * sentencesPerScene;
-      const endIdx = i === 2 ? sentences.length : (i + 1) * sentencesPerScene;
-      const sceneText = sentences.slice(startIdx, endIdx).join('. ').trim() + '.';
+      const endIdx = i === 5 ? sentences.length : (i + 1) * sentencesPerScene;
+      const sceneText = sentences.slice(startIdx, endIdx).join('. ').trim() + (endIdx > startIdx ? '.' : '');
 
       scenes.push({
         id: `ai_scene_${i}`,
@@ -157,8 +158,11 @@ If a photograph/selfie is provided, first analyze it and creatively transform th
 Instructions:
 1) Analyze and Stylize Reference Image (if provided) to establish the official artistic look.
 2) Read the user’s story idea below to understand plot, settings, and actions.
-3) Identify exactly 3 of the most visually compelling and narratively significant scenes.
-4) For each of the 3 scenes, generate a high-quality, family-friendly illustration featuring the established character placed within the scene.
+3) Identify exactly 6 scenes (pages) that tell a complete bedtime story arc.
+   - Scene 3 MUST be an interactive page that explicitly prompts the child to speak a word or short phrase.
+   - Include a clear voice instruction using this exact pattern somewhere on Scene 3: Say "<keyword>" to <action>.
+   - Choose a friendly keyword kids can easily say, e.g., "let's go", "goodnight", or "magic".
+4) For each of the 6 scenes, generate a high-quality, family-friendly illustration featuring the established character placed within the scene.
 5) Also write clear, age-appropriate narrative text for each scene (a short paragraph) that matches the illustration.
 
 Strict Prohibitions:
@@ -168,6 +172,7 @@ Strict Prohibitions:
 Story idea: ${prompt}
 
 Output format guidance:
+- Start each scene with a label like "Scene 1:" (or "Chapter 1:") followed by the scene title on the next line; then write the paragraph for that scene.
 - Provide narrative text naturally as part of the response and include images as inline data in the multimodal output. The application will parse both text and images.
 `;
 
